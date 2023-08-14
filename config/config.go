@@ -1,16 +1,15 @@
-// Package request is the utility function that keeps the client-server
+// Package config is the utility function that keeps the client-server
 // request parameters.
 //
 // Supported request parameters:
 // - REQUEST_TIMEOUT how long the client waits until the server doesn't reply.
 // - ATTEMPT how many attempts the client makes to send the Request before it returns an error.
-package request
+package config
 
 import (
 	"context"
+	"github.com/ahmetson/config-lib"
 	"time"
-
-	"github.com/ahmetson/service-lib/config"
 )
 
 // todo remove the functions

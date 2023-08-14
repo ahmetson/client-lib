@@ -3,13 +3,12 @@ package client
 
 import (
 	"fmt"
+	"github.com/ahmetson/client-lib/config"
 	"github.com/ahmetson/log-lib"
-	"github.com/ahmetson/service-lib/config/request"
-	"github.com/ahmetson/service-lib/config/service"
 
 	"github.com/ahmetson/common-lib/data_type/key_value"
 	"github.com/ahmetson/common-lib/message"
-	"github.com/ahmetson/service-lib/config"
+	configEngine "github.com/ahmetson/config-lib"
 
 	// todo
 	// move out dependency from security/auth
@@ -28,7 +27,7 @@ type ClientSocket struct {
 	socket          *zmq.Socket
 	protocol        string
 	logger          *log.Logger
-	appConfig       *config.Config
+	appConfig       *configEngine.Config
 	serviceName     string
 	servicePort     uint64
 }
@@ -222,15 +221,15 @@ func (socket *ClientSocket) Close() error {
 //		//  Poll socket for a reply, with timeout
 //		sockets, err := socket.poller.Poll(requestTimeout)
 //		if err != nil {
-//			return nil, fmt.Errorf("failed to to send the command '%s'. poll error: %w", request.Command, err)
+//			return nil, fmt.Errorf("failed to send the command '%s'. poll error: %w", request.Command, err)
 //		}
 //
 //		//  Here we process a server reply and exit our loop if the
 //		//  reply is valid.
-//		//  If we didn't have a reply, we close the client
-//		//  socket and resend the request.
-//		//  We try a number of times
-//		//  before finally abandoning:
+//		// If we didn't have a reply, we close the client
+//		// socket and resend the request.
+//		// We try a number of times
+//		// before finally abandoning:
 //
 //		if len(sockets) > 0 {
 //			// Wait for a reply.
@@ -293,14 +292,14 @@ func (socket *ClientSocket) RequestRemoteService(req *message.Request) (key_valu
 		}
 	}
 
-	requestTimeout := request.RequestTimeout(socket.appConfig)
+	requestTimeout := config.RequestTimeout(socket.appConfig)
 
 	requestString, err := req.String()
 	if err != nil {
 		return nil, fmt.Errorf("request.String: %w", err)
 	}
 
-	attempt := request.Attempt(socket.appConfig)
+	attempt := config.Attempt(socket.appConfig)
 
 	// we attempt requests for an infinite amount of time.
 	for {
@@ -378,9 +377,9 @@ func (socket *ClientSocket) RequestRawMessage(requestString string) ([]string, e
 		}
 	}
 
-	requestTimeout := request.RequestTimeout(socket.appConfig)
+	requestTimeout := config.RequestTimeout(socket.appConfig)
 
-	attempt := request.Attempt(socket.appConfig)
+	attempt := config.Attempt(socket.appConfig)
 
 	// we attempt requests for an infinite amount of time.
 	for {
@@ -443,7 +442,7 @@ func (socket *ClientSocket) RequestRawMessage(requestString string) ([]string, e
 // NewTcpSocket creates a new client socket over TCP protocol.
 //
 // The returned socket client then can send a message to server.Router and server.Reply
-func NewTcpSocket(remoteService *service.Service, parent *log.Logger, appConfig *config.Config) (*ClientSocket, error) {
+func NewTcpSocket(parent *log.Logger, appConfig *configEngine.Config) (*ClientSocket, error) {
 	if appConfig == nil {
 		return nil, fmt.Errorf("missing app_config")
 	}
@@ -517,7 +516,7 @@ func NewReq(name string, port uint64, parent *log.Logger) (*ClientSocket, error)
 // The created client socket can connect to server.Router or server.Reply.
 //
 // The `url` request must start with `inproc://`
-func InprocRequestSocket(url string, parent *log.Logger, appConfig *config.Config) (*ClientSocket, error) {
+func InprocRequestSocket(url string, parent *log.Logger, appConfig *configEngine.Config) (*ClientSocket, error) {
 	if appConfig == nil {
 		return nil, fmt.Errorf("missing app_config")
 	}
