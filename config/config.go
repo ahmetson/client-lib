@@ -12,6 +12,12 @@ import (
 	"time"
 )
 
+type Client struct {
+	Url  string
+	Id   string
+	Port uint64
+}
+
 // todo remove the functions
 // and set the default values to the request timeout
 
