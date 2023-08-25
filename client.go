@@ -312,10 +312,10 @@ func (socket *ClientSocket) RequestRawMessage(requestString string) ([]string, e
 	}
 }
 
-// ClientUrl creates url of the server for the client to connect
+// Url creates url of the server for the client to connect
 //
 // If the port is 0, then the client will be inproc, not as tcp
-func ClientUrl(name string, port uint64) string {
+func Url(name string, port uint64) string {
 	if port == 0 {
 		return fmt.Sprintf("inproc://%s", name)
 	}
