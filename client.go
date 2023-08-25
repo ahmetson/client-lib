@@ -180,14 +180,14 @@ func (socket *Socket) RawRequest(raw string) ([]string, error) {
 
 			return r, nil
 		} else {
-			if attempt == 0 {
-				return nil, fmt.Errorf("timeout")
-			}
-			attempt--
-
 			err := socket.reconnect()
 			if err != nil {
 				return nil, fmt.Errorf("zmqSocket.inproc_reconnect: %w", err)
+			}
+
+			attempt--
+			if attempt == 0 {
+				return nil, fmt.Errorf("timeout")
 			}
 		}
 	}
