@@ -32,37 +32,6 @@ type ClientSocket struct {
 	servicePort     uint64
 }
 
-// Clients is the key value but with the additional functions
-// to cast the interface{} to ClientSocket
-type Clients = key_value.KeyValue
-
-// AddClient Adds the client to the list of the clients
-func AddClient(clients Clients, name string, socket *ClientSocket) {
-	clients.Set(name, socket)
-}
-
-// ClientExist checks whether the client exists or not
-func ClientExist(clients Clients, name string) bool {
-	return clients.Exist(name) == nil
-}
-
-// GetClient returns the client from the list
-func GetClient(clients Clients, name string) *ClientSocket {
-	kv := clients.Map()
-	return kv[name].(*ClientSocket)
-}
-
-// FindClient returns the client from the list
-func FindClient(clients []*ClientSocket, name string) *ClientSocket {
-	for _, client := range clients {
-		if client.serviceName == name {
-			return client
-		}
-	}
-
-	return nil
-}
-
 // Initiates the socket with a timeout.
 // If the socket is already given, then reconnect() closes it.
 // Then create a new socket.
