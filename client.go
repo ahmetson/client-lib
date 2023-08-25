@@ -1,192 +1,152 @@
-// Package client defines client socket that can access to the client service.
+// Package client defines client zmqSocket that can access to the client service.
 package client
 
 import (
 	"fmt"
-	"github.com/ahmetson/client-lib/config"
-	"github.com/ahmetson/log-lib"
+	"time"
 
 	"github.com/ahmetson/common-lib/data_type/key_value"
 	"github.com/ahmetson/common-lib/message"
-	configEngine "github.com/ahmetson/config-lib"
 	zmq "github.com/pebbe/zmq4"
 )
 
-// ClientSocket is the wrapper around zeromq's socket.
-// The socket is the client's socket that will try to interact with the client service.
-type ClientSocket struct {
-	// The name of client SDS service and its URL
-	// its used as a clarification
-	// client_credentials *auth.Credentials
-	serverPublicKey string
-	poller          *zmq.Poller
-	socket          *zmq.Socket
-	protocol        string
-	logger          *log.Logger
-	appConfig       *configEngine.Config
-	serviceName     string
-	servicePort     uint64
-}
-
-// Initiates the socket with a timeout.
-// If the socket is already given, then reconnect() closes it.
-// Then create a new socket.
-//
-// If no socket is given, then initiate a zmq.REQ socket.
-func (socket *ClientSocket) reconnect() error {
-	var socketCtx *zmq.Context
-	var socketType zmq.Type
-
-	if socket.socket != nil {
-		ctx, err := socket.socket.Context()
-		if err != nil {
-			return fmt.Errorf("failed to get orchestra from zmq socket: %w", err)
-		} else {
-			socketCtx = ctx
-		}
-
-		socketType, err = socket.socket.GetType()
-		if err != nil {
-			return fmt.Errorf("failed to get socket type from zmq socket: %w", err)
-		}
-
-		err = socket.Close()
-		if err != nil {
-			return fmt.Errorf("failed to close socket in zmq: %w", err)
-		}
-		socket.socket = nil
-	} else {
-		return fmt.Errorf("no socket initiated: %s", "reconnect")
-	}
-
-	sock, err := socketCtx.NewSocket(socketType)
-	if err != nil {
-		return fmt.Errorf("failed to create %s socket: %w", socketType.String(), err)
-	} else {
-		socket.socket = sock
-		err = socket.socket.SetLinger(0)
-		if err != nil {
-			return fmt.Errorf("failed to set up linger request for zmq socket: %w", err)
-		}
-	}
-
-	// if socket.client_credentials != nil {
-	// socket.client_credentials.SetClientAuthCurve(socket.socket, socket.server_public_key)
-	// if err != nil {
-	// return fmt.Errorf("auth.SetClientAuthCurve: %w", err)
-	// }
-	// }
-
-	if err := socket.socket.Connect(ClientUrl(socket.serviceName, socket.servicePort)); err != nil {
-		return fmt.Errorf("socket connect: %w", err)
-	}
-
-	socket.poller = zmq.NewPoller()
-	socket.poller.Add(socket.socket, zmq.POLLIN)
-
-	return nil
+// Socket is the wrapper around zeromq's zmqSocket.
+// The zmqSocket is the client's zmqSocket that will try to interact with the client service.
+type Socket struct {
+	poller     *zmq.Poller
+	zmqSocket  *zmq.Socket
+	url        string
+	timeout    time.Duration
+	attempt    uint8
+	socketType zmq.Type
+	target     zmq.Type
 }
 
 // Attempts to connect to the endpoint.
-// The difference from socket.reconnect() is that it will not authenticate if security is enabled.
-func (socket *ClientSocket) inprocReconnect() error {
-	var socketCtx *zmq.Context
-	var socketType zmq.Type
-
-	if socket.socket != nil {
-		ctx, err := socket.socket.Context()
-		if err != nil {
-			return fmt.Errorf("failed to get orchestra from zmq socket: %w", err)
-		} else {
-			socketCtx = ctx
+// The difference from zmqSocket.reconnect() is that it will not authenticate if security is enabled.
+func (socket *Socket) inprocReconnect() error {
+	if socket.zmqSocket != nil {
+		if err := socket.Close(); err != nil {
+			return fmt.Errorf("failed to close zmqSocket in zmq: %w", err)
 		}
-
-		socketType, err = socket.socket.GetType()
-		if err != nil {
-			return fmt.Errorf("failed to get socket type from zmq socket: %w", err)
-		}
-
-		err = socket.Close()
-		if err != nil {
-			return fmt.Errorf("failed to close socket in zmq: %w", err)
-		}
-		socket.socket = nil
-	} else {
-		return fmt.Errorf("failed to create zmq orchestra: %s", "inproc_reconnect")
+		socket.zmqSocket = nil
 	}
 
-	sock, err := socketCtx.NewSocket(socketType)
+	var err error
+	socket.zmqSocket, err = zmq.NewSocket(socket.socketType)
 	if err != nil {
-		return fmt.Errorf("failed to create %s socket: %w", socketType.String(), err)
-	} else {
-		socket.socket = sock
-		err = socket.socket.SetLinger(0)
-		if err != nil {
-			return fmt.Errorf("failed to set up linger request for zmq socket: %w", err)
-		}
+		return fmt.Errorf("zmq.NewSocket('%s'): %w", socket.socketType.String(), err)
 	}
 
-	if err := socket.socket.Connect(ClientUrl(socket.serviceName, socket.servicePort)); err != nil {
-		return fmt.Errorf("socket.socket.Connect: %w", err)
+	if err := socket.zmqSocket.SetLinger(0); err != nil {
+		return fmt.Errorf("zmqSocket.SetLinger(0): %w", err)
+	}
+
+	if err := socket.zmqSocket.Connect(socket.url); err != nil {
+		return fmt.Errorf("zmqSocket.Connect('%s'): %w", socket.url, err)
 	}
 
 	socket.poller = zmq.NewPoller()
-	socket.poller.Add(socket.socket, zmq.POLLIN)
+	socket.poller.Add(socket.zmqSocket, zmq.POLLIN)
 
 	return nil
 }
 
-// Close the socket free the port and resources.
-func (socket *ClientSocket) Close() error {
-	err := socket.socket.Close()
+// Close the zmqSocket free the port and resources.
+func (socket *Socket) Close() error {
+	err := socket.zmqSocket.Close()
 	if err != nil {
-		return fmt.Errorf("error closing socket: %w", err)
+		return fmt.Errorf("error closing zmqSocket: %w", err)
 	}
 
 	return nil
 }
 
+// New client based on the target
+func New(target zmq.Type, url string) (*Socket, error) {
+	if !IsTarget(target) {
+		return nil, fmt.Errorf("target is not supported")
+	}
+	socketType := SocketType(target)
+	socket := &Socket{
+		zmqSocket:  nil,
+		timeout:    time.Second * 10,
+		attempt:    5,
+		target:     target,
+		socketType: socketType,
+		url:        url,
+	}
 
-// RequestRemoteService sends the request message to the socket.
+	return socket, nil
+}
+
+func IsTarget(target zmq.Type) bool {
+	return target == zmq.REP || target == zmq.ROUTER || target == zmq.PUB || target == zmq.PUSH || target == zmq.PULL
+}
+
+// SocketType gets the ZMQ analog of the handler type for the clients
+func SocketType(target zmq.Type) zmq.Type {
+	switch target {
+	case zmq.PUB:
+		return zmq.SUB
+	case zmq.PUSH:
+		return zmq.PULL
+	case zmq.PULL:
+		return zmq.PUSH
+	default:
+		// For zmq.REP and zmq.ROUTER
+		return zmq.REQ
+	}
+}
+
+func (socket *Socket) Timeout(timeout time.Duration) *Socket {
+	if timeout < time.Millisecond*2 {
+		timeout = time.Millisecond
+	}
+
+	socket.timeout = timeout
+	return socket
+}
+
+func (socket *Socket) Attempt(attempt uint8) *Socket {
+	if attempt < 1 {
+		attempt = 1
+	}
+
+	socket.attempt = attempt
+	return socket
+}
+
+// Request sends the request message to the zmqSocket.
 // Returns the message.Reply.Parameters in case of success.
 //
 // Error is returned in other cases.
 //
 // If the client service returned a failure message, it's converted into an error.
 //
-// The socket type should be REQ or PUSH.
-func (socket *ClientSocket) RequestRemoteService(req *message.Request) (key_value.KeyValue, error) {
-	if socket.protocol == "inproc" {
-		err := socket.inprocReconnect()
-		if err != nil {
-			return nil, fmt.Errorf("socket connection: %w", err)
-		}
-
-	} else {
-		err := socket.reconnect()
-		if err != nil {
-			return nil, fmt.Errorf("socket connection: %w", err)
-		}
+// The zmqSocket type should be REQ or PUSH.
+func (socket *Socket) Request(req *message.Request) (key_value.KeyValue, error) {
+	err := socket.inprocReconnect()
+	if err != nil {
+		return nil, fmt.Errorf("zmqSocket connection: %w", err)
 	}
-
-	requestTimeout := config.RequestTimeout(socket.appConfig)
 
 	requestString, err := req.String()
 	if err != nil {
 		return nil, fmt.Errorf("request.String: %w", err)
 	}
 
-	attempt := config.Attempt(socket.appConfig)
+	attempt := socket.attempt
 
 	// we attempt requests for an infinite amount of time.
 	for {
 		//  We send a request, then we work to get a reply
-		if _, err := socket.socket.SendMessage(requestString); err != nil {
-			return nil, fmt.Errorf("failed to send the command '%s'. socket error: %w", req.Command, err)
+		if _, err := socket.zmqSocket.SendMessage(requestString); err != nil {
+			return nil, fmt.Errorf("failed to send the command '%s'. zmqSocket error: %w", req.Command, err)
 		}
 
-		//  Poll socket for a reply, with timeout
-		sockets, err := socket.poller.Poll(requestTimeout)
+		//  Poll zmqSocket for a reply, with timeout
+		sockets, err := socket.poller.Poll(socket.timeout)
 		if err != nil {
 			return nil, fmt.Errorf("failed to to send the command '%s'. poll error: %w", req.Command, err)
 		}
@@ -194,15 +154,15 @@ func (socket *ClientSocket) RequestRemoteService(req *message.Request) (key_valu
 		//  Here we process a server reply and exit our loop if the
 		//  reply is valid.
 		// If we didn't have a reply, we close the client
-		//  socket and resend the request.
+		//  zmqSocket and resend the request.
 		// We try a number of times
 		//  before finally abandoning:
 
 		if len(sockets) > 0 {
 			// Wait for a reply.
-			r, err := socket.socket.RecvMessage(0)
+			r, err := socket.zmqSocket.RecvMessage(0)
 			if err != nil {
-				return nil, fmt.Errorf("failed to receive the command '%s' message. socket error: %w", req.Command, err)
+				return nil, fmt.Errorf("failed to receive the command '%s' message. zmqSocket error: %w", req.Command, err)
 			}
 
 			reply, err := message.ParseReply(r)
@@ -219,54 +179,36 @@ func (socket *ClientSocket) RequestRemoteService(req *message.Request) (key_valu
 
 			return reply.Parameters, nil
 		} else {
-			socket.logger.Warn("timeout", "request_command", req.Command, "attempts_left", attempt)
-			if socket.protocol == "inproc" {
-				err := socket.inprocReconnect()
-				if err != nil {
-					return nil, fmt.Errorf("socket.inproc_reconnect: %w", err)
-				}
-			} else {
-				err := socket.reconnect()
-				if err != nil {
-					return nil, fmt.Errorf("socket.reconnect: %w", err)
-				}
-			}
-
 			if attempt == 0 {
 				return nil, fmt.Errorf("timeout")
 			}
 			attempt--
+
+			err := socket.inprocReconnect()
+			if err != nil {
+				return nil, fmt.Errorf("zmqSocket.inproc_reconnect: %w", err)
+			}
 		}
 	}
 }
 
-func (socket *ClientSocket) RequestRawMessage(requestString string) ([]string, error) {
-	if socket.protocol == "inproc" {
-		err := socket.inprocReconnect()
-		if err != nil {
-			return nil, fmt.Errorf("socket connection: %w", err)
-		}
-
-	} else {
-		err := socket.reconnect()
-		if err != nil {
-			return nil, fmt.Errorf("socket connection: %w", err)
-		}
+func (socket *Socket) RequestRawMessage(requestString string) ([]string, error) {
+	err := socket.inprocReconnect()
+	if err != nil {
+		return nil, fmt.Errorf("zmqSocket connection: %w", err)
 	}
 
-	requestTimeout := config.RequestTimeout(socket.appConfig)
-
-	attempt := config.Attempt(socket.appConfig)
+	attempt := socket.attempt
 
 	// we attempt requests for an infinite amount of time.
 	for {
 		//  We send a request, then we work to get a reply
-		if _, err := socket.socket.SendMessage(requestString); err != nil {
-			return nil, fmt.Errorf("failed to send the message. socket error: %w", err)
+		if _, err := socket.zmqSocket.SendMessage(requestString); err != nil {
+			return nil, fmt.Errorf("failed to send the message. zmqSocket error: %w", err)
 		}
 
-		// Poll socket for a reply, with timeout
-		sockets, err := socket.poller.Poll(requestTimeout)
+		// Poll zmqSocket for a reply, with timeout
+		sockets, err := socket.poller.Poll(socket.timeout)
 		if err != nil {
 			return nil, fmt.Errorf("poll error: %w", err)
 		}
@@ -274,36 +216,28 @@ func (socket *ClientSocket) RequestRawMessage(requestString string) ([]string, e
 		// Here we process a server reply and exit our loop if the
 		//  reply is valid.
 		// If we didn't have a reply, we close the client
-		//  socket and resend the request.
+		//  zmqSocket and resend the request.
 		// We try a number of times
 		//  before finally abandoning:
 
 		if len(sockets) > 0 {
 			// Wait for a reply.
-			r, err := socket.socket.RecvMessage(0)
+			r, err := socket.zmqSocket.RecvMessage(0)
 			if err != nil {
-				return nil, fmt.Errorf("failed to message. socket error: %w", err)
+				return nil, fmt.Errorf("failed to message. zmqSocket error: %w", err)
 			}
 
 			return r, nil
 		} else {
-			socket.logger.Warn("timeout", "attempts_left", attempt)
-			if socket.protocol == "inproc" {
-				err := socket.inprocReconnect()
-				if err != nil {
-					return nil, fmt.Errorf("socket.inproc_reconnect: %w", err)
-				}
-			} else {
-				err := socket.reconnect()
-				if err != nil {
-					return nil, fmt.Errorf("socket.reconnect: %w", err)
-				}
-			}
-
 			if attempt == 0 {
 				return nil, fmt.Errorf("timeout")
 			}
 			attempt--
+
+			err := socket.inprocReconnect()
+			if err != nil {
+				return nil, fmt.Errorf("zmqSocket.inproc_reconnect: %w", err)
+			}
 		}
 	}
 }
