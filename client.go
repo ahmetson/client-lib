@@ -24,7 +24,7 @@ type Socket struct {
 
 // Attempts to connect to the endpoint.
 // The difference from zmqSocket.reconnect() is that it will not authenticate if security is enabled.
-func (socket *Socket) inprocReconnect() error {
+func (socket *Socket) reconnect() error {
 	if socket.zmqSocket != nil {
 		if err := socket.Close(); err != nil {
 			return fmt.Errorf("failed to close zmqSocket in zmq: %w", err)
@@ -126,7 +126,7 @@ func (socket *Socket) Attempt(attempt uint8) *Socket {
 //
 // The zmqSocket type should be REQ or PUSH.
 func (socket *Socket) Request(req *message.Request) (key_value.KeyValue, error) {
-	err := socket.inprocReconnect()
+	err := socket.reconnect()
 	if err != nil {
 		return nil, fmt.Errorf("zmqSocket connection: %w", err)
 	}
@@ -184,7 +184,7 @@ func (socket *Socket) Request(req *message.Request) (key_value.KeyValue, error) 
 			}
 			attempt--
 
-			err := socket.inprocReconnect()
+			err := socket.reconnect()
 			if err != nil {
 				return nil, fmt.Errorf("zmqSocket.inproc_reconnect: %w", err)
 			}
@@ -193,7 +193,7 @@ func (socket *Socket) Request(req *message.Request) (key_value.KeyValue, error) 
 }
 
 func (socket *Socket) RequestRawMessage(requestString string) ([]string, error) {
-	err := socket.inprocReconnect()
+	err := socket.reconnect()
 	if err != nil {
 		return nil, fmt.Errorf("zmqSocket connection: %w", err)
 	}
@@ -234,7 +234,7 @@ func (socket *Socket) RequestRawMessage(requestString string) ([]string, error) 
 			}
 			attempt--
 
-			err := socket.inprocReconnect()
+			err := socket.reconnect()
 			if err != nil {
 				return nil, fmt.Errorf("zmqSocket.inproc_reconnect: %w", err)
 			}
