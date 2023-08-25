@@ -9,10 +9,6 @@ import (
 	"github.com/ahmetson/common-lib/data_type/key_value"
 	"github.com/ahmetson/common-lib/message"
 	configEngine "github.com/ahmetson/config-lib"
-
-	// todo
-	// move out dependency from security/auth
-	// "github.com/ahmetson/service-lib/security/auth"
 	zmq "github.com/pebbe/zmq4"
 )
 
