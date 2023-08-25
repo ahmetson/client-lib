@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ahmetson/common-lib/data_type/key_value"
 	"github.com/ahmetson/common-lib/message"
 	zmq "github.com/pebbe/zmq4"
 )
@@ -125,67 +124,26 @@ func (socket *Socket) Attempt(attempt uint8) *Socket {
 // If the client service returned a failure message, it's converted into an error.
 //
 // The zmqSocket type should be REQ or PUSH.
-func (socket *Socket) Request(req *message.Request) (key_value.KeyValue, error) {
-	err := socket.reconnect()
-	if err != nil {
-		return nil, fmt.Errorf("zmqSocket connection: %w", err)
-	}
-
-	requestString, err := req.String()
+func (socket *Socket) Request(req *message.Request) (*message.Reply, error) {
+	reqStr, err := req.String()
 	if err != nil {
 		return nil, fmt.Errorf("request.String: %w", err)
 	}
 
-	attempt := socket.attempt
+	rawReply, err := socket.RawRequest(reqStr)
 
-	// we attempt requests for an infinite amount of time.
-	for {
-		//  We send a request, then we work to get a reply
-		if _, err := socket.zmqSocket.SendMessage(requestString); err != nil {
-			return nil, fmt.Errorf("failed to send the command '%s'. zmqSocket error: %w", req.Command, err)
-		}
-
-		//  Poll zmqSocket for a reply, with timeout
-		sockets, err := socket.poller.Poll(socket.timeout)
-		if err != nil {
-			return nil, fmt.Errorf("failed to to send the command '%s'. poll error: %w", req.Command, err)
-		}
-
-		if len(sockets) > 0 {
-			// Wait for a reply.
-			r, err := socket.zmqSocket.RecvMessage(0)
-			if err != nil {
-				return nil, fmt.Errorf("failed to receive the command '%s' message. zmqSocket error: %w", req.Command, err)
-			}
-
-			reply, err := message.ParseReply(r)
-			if err != nil {
-				return nil, fmt.Errorf("failed to parse the command '%s': %w", req.Command, err)
-			}
-
-			// client service will add its own stack.
-			req.SyncTrace(&reply)
-
-			if !reply.IsOK() {
-				return nil, fmt.Errorf("the command '%s' replied with a failure: %s", req.Command, reply.Message)
-			}
-
-			return reply.Parameters, nil
-		} else {
-			if attempt == 0 {
-				return nil, fmt.Errorf("timeout")
-			}
-			attempt--
-
-			err := socket.reconnect()
-			if err != nil {
-				return nil, fmt.Errorf("zmqSocket.inproc_reconnect: %w", err)
-			}
-		}
+	reply, err := message.ParseReply(rawReply)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse the command '%s': %w", req.Command, err)
 	}
+
+	// client service will add its own stack.
+	req.SyncTrace(&reply)
+
+	return &reply, nil
 }
 
-func (socket *Socket) RequestRawMessage(requestString string) ([]string, error) {
+func (socket *Socket) RawRequest(raw string) ([]string, error) {
 	err := socket.reconnect()
 	if err != nil {
 		return nil, fmt.Errorf("zmqSocket connection: %w", err)
@@ -195,9 +153,16 @@ func (socket *Socket) RequestRawMessage(requestString string) ([]string, error) 
 
 	// we attempt requests for an infinite amount of time.
 	for {
-		//  We send a request, then we work to get a reply
-		if _, err := socket.zmqSocket.SendMessage(requestString); err != nil {
-			return nil, fmt.Errorf("failed to send the message. zmqSocket error: %w", err)
+		if socket.socketType == zmq.DEALER {
+			//  We send a request, then we work to get a reply
+			if _, err := socket.zmqSocket.SendMessage("", raw); err != nil {
+				return nil, fmt.Errorf("failed to send the message. zmqSocket error: %w", err)
+			}
+		} else {
+			//  We send a request, then we work to get a reply
+			if _, err := socket.zmqSocket.SendMessage(raw); err != nil {
+				return nil, fmt.Errorf("failed to send the message. zmqSocket error: %w", err)
+			}
 		}
 
 		// Poll zmqSocket for a reply, with timeout
