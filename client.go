@@ -151,13 +151,6 @@ func (socket *Socket) Request(req *message.Request) (key_value.KeyValue, error) 
 			return nil, fmt.Errorf("failed to to send the command '%s'. poll error: %w", req.Command, err)
 		}
 
-		//  Here we process a server reply and exit our loop if the
-		//  reply is valid.
-		// If we didn't have a reply, we close the client
-		//  zmqSocket and resend the request.
-		// We try a number of times
-		//  before finally abandoning:
-
 		if len(sockets) > 0 {
 			// Wait for a reply.
 			r, err := socket.zmqSocket.RecvMessage(0)
@@ -212,13 +205,6 @@ func (socket *Socket) RequestRawMessage(requestString string) ([]string, error) 
 		if err != nil {
 			return nil, fmt.Errorf("poll error: %w", err)
 		}
-
-		// Here we process a server reply and exit our loop if the
-		//  reply is valid.
-		// If we didn't have a reply, we close the client
-		//  zmqSocket and resend the request.
-		// We try a number of times
-		//  before finally abandoning:
 
 		if len(sockets) > 0 {
 			// Wait for a reply.
