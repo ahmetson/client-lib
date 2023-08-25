@@ -312,14 +312,6 @@ func (socket *ClientSocket) RequestRawMessage(requestString string) ([]string, e
 	}
 }
 
-// // SetSecurity will set the curve credentials in the socket to authenticate with the client service.
-// func (socket *ClientSocket) SetSecurity(server_public_key string, client *auth.Credentials) *ClientSocket {
-// 	socket.server_public_key = server_public_key
-// 	socket.client_credentials = client
-
-// 	return socket
-// }
-
 // NewTcpSocket creates a new client socket over TCP protocol.
 //
 // The returned socket client then can send a message to server.Router and server.Reply
@@ -432,57 +424,6 @@ func InprocRequestSocket(url string, parent *log.Logger, appConfig *configEngine
 
 	return &newSocket, nil
 }
-
-// // NewTcpSubscriber create a new client socket on TCP protocol.
-// // The created client can subscribe to broadcast.Broadcast
-// func NewTcpSubscriber(e *service.Service, server_public_key string, client *auth.Credentials, parent log.Logger, app_config *config.GetServiceConfig) (*ClientSocket, error) {
-// 	if app_config == nil {
-// 		return nil, fmt.Errorf("missing app_config")
-// 	}
-// 	if e == nil {
-// 		return nil, fmt.Errorf("missing service")
-// 	}
-// 	if !e.IsSubscribe() || e.IsInproc() {
-// 		return nil, fmt.Errorf("the service is of tcp protocol, or it doesn't SUBSCRIBE limit")
-// 	}
-
-// 	socket, sockErr := zmq.NewSocket(zmq.SUB)
-// 	if sockErr != nil {
-// 		return nil, fmt.Errorf("new sub socket: %w", sockErr)
-// 	}
-
-// 	if client != nil {
-// 		err := client.SetClientAuthCurve(socket, server_public_key)
-// 		if err != nil {
-// 			return nil, fmt.Errorf("client.SetClientAuthCurve: %w", err)
-// 		}
-// 	}
-
-// 	conErr := socket.Connect(e.Url())
-// 	if conErr != nil {
-// 		return nil, fmt.Errorf("connect to broadcast: %w", conErr)
-// 	}
-
-// 	logger, err := parent.Child("client_socket",
-// 		"remote_service", e.Url,
-// 		"protocol", "tcp",
-// 		"socket_type", "Subscriber",
-// 		"remote_service_url", e.Url(),
-// 	)
-// 	if err != nil {
-// 		return nil, fmt.Errorf("logger: %w", err)
-// 	}
-
-// 	return &ClientSocket{
-// 		remote_service:     e,
-// 		socket:             socket,
-// 		client_credentials: client,
-// 		server_public_key:  server_public_key,
-// 		protocol:           "tcp",
-// 		logger:             logger,
-// 		app_config:         app_config,
-// 	}, nil
-// }
 
 // ClientUrl creates url of the server for the client to connect
 //
