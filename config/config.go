@@ -1,73 +1,52 @@
 // Package config is the utility function that keeps the client-server
-// request parameters.
-//
-// Supported request parameters:
-// - REQUEST_TIMEOUT how long the client waits until the server doesn't reply.
-// - ATTEMPT how many attempts the client makes to send the Request before it returns an error.
 package config
 
 import (
-	"context"
-	"github.com/ahmetson/config-lib"
-	"time"
+	"fmt"
+	zmq "github.com/pebbe/zmq4"
 )
 
+// A Client parameters to connect to the dep
 type Client struct {
-	Url  string
-	Id   string
-	Port uint64
+	ServiceUrl string // Url link of the service
+	Id         string
+	Port       uint64
+	TargetType zmq.Type // The service's socket type
+	urlFunc    func(*Client) string
 }
 
-// todo remove the functions
-// and set the default values to the request timeout
-
-// Request-Reply checks the internet connection after this amount of time.
-// This is the default time if arg wasn't given that changes the REQUEST_TIMEOUT
-const (
-	// DefaultTimeout in the seconds.
-	// Set the SDS_REQUEST_TIMEOUT.
-	// If the timeout is float, then its rounded
-	DefaultTimeout = 30 * time.Second
-	// DefaultAttempt How many attempts to do if the client socket doesn't respond.
-	// Set the SDS_REQUEST_ATTEMPT
-	// If the SDS_REQUEST_ATTEMPT is a float number
-	// then its rounded.
-	DefaultAttempt = uint(5)
-)
-
-// NewContextWithTimeout returns a new orchestra with the request timeout
-// and the timeout with SDS_REQUEST_TIMEOUT
-func NewContextWithTimeout(parent context.Context, appConfig *config.Config) (context.Context, context.CancelFunc) {
-	newCtx, cancelFunc := context.WithTimeout(parent, RequestTimeout(appConfig))
-	return newCtx, cancelFunc
+func New(url string, id string, port uint64, socketType zmq.Type) *Client {
+	return &Client{
+		ServiceUrl: url,
+		Id:         id,
+		Port:       port,
+		TargetType: socketType,
+		urlFunc:    nil,
+	}
 }
 
-// RequestTimeout Request timeout, from the config.
-// If the config doesn't exist, then return the default value.
-func RequestTimeout(appConfig *config.Config) time.Duration {
-	requestTimeout := DefaultTimeout
-	if appConfig != nil && appConfig.Exist("SDS_REQUEST_TIMEOUT") {
-		envTimeout := appConfig.GetUint64("SDS_REQUEST_TIMEOUT")
-		if envTimeout != 0 {
-			requestTimeout = time.Duration(envTimeout) * time.Second
-		}
+// UrlFunc sets the context to generate the url
+func (client *Client) UrlFunc(urlFunc func(*Client) string) {
+	client.urlFunc = urlFunc
+}
+
+// Url of the client
+func (client *Client) Url() string {
+	if client.urlFunc == nil {
+		return ""
 	}
 
-	return requestTimeout
+	return client.urlFunc(client)
 }
 
-// Attempt How many attempts we make to request the client service before we will
-// return an error.
-// It returns the attempt amount from the config.
-// If the config doesn't exist, then we the default value.
-func Attempt(appConfig *config.Config) uint {
-	attempt := DefaultAttempt
-	if appConfig != nil && appConfig.Exist("SDS_REQUEST_ATTEMPT") {
-		envAttempt := appConfig.GetUint64("SDS_REQUEST_ATTEMPT")
-		if envAttempt != 0 {
-			attempt = uint(envAttempt)
-		}
+// Url creates url of the server for the client to connect
+//
+// If the port is 0, then the client will be inproc, not as tcp
+// todo move to context
+func Url(id string, port uint64) string {
+	if port == 0 {
+		return fmt.Sprintf("inproc://%s", id)
 	}
-
-	return attempt
+	url := fmt.Sprintf("tcp://localhost:%d", port)
+	return url
 }
