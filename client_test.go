@@ -58,6 +58,9 @@ func (test *TestClientSuite) runBackend(url string, zmqType zmq.Type) {
 
 	fmt.Printf("backend waits for messages...\n")
 	msg, err := test.backend.RecvMessage(0)
+	if err == zmq.ErrorSocketClosed {
+		return
+	}
 	require().NoError(err)
 
 	fmt.Printf("backend received: %s\n", msg)
@@ -79,7 +82,7 @@ func (test *TestClientSuite) runBackend(url string, zmqType zmq.Type) {
 	err = test.backend.Close()
 	require().NoError(err)
 
-	fmt.Printf("backed closed!\n")
+	fmt.Printf("backend closed!\n")
 
 	test.backend = nil
 }
@@ -127,8 +130,10 @@ func (test *TestClientSuite) Test_12_rawSubmit() {
 	require := test.Require
 
 	go test.runBackend(test.socket.url, test.socket.target)
+	// Wait a bit for initialization
+	time.Sleep(time.Millisecond * 100)
 
-	req := "hello"
+	req := "hello Test_12_rawSubmit"
 	err := test.socket.rawSubmit(req)
 	require().NoError(err)
 }
@@ -138,8 +143,10 @@ func (test *TestClientSuite) Test_13_RawRequest() {
 	require := test.Require
 
 	go test.runBackend(test.socket.url, test.socket.target)
+	// Wait a bit for initialization
+	time.Sleep(time.Millisecond * 100)
 
-	req := "hello"
+	req := "hello Test_13_RawRequest"
 	reply, err := test.socket.RawRequest(req)
 	require().NoError(err)
 	fmt.Printf("client recevied: %s\n", reply)
@@ -151,8 +158,49 @@ func (test *TestClientSuite) Test_14_RawSubmit() {
 
 	go test.runBackend(test.socket.url, test.socket.target)
 
-	req := "hello"
+	req := "hello Test_14_RawSubmit"
 	err := test.socket.RawSubmit(req)
+	require().NoError(err)
+}
+
+// Test_15_DealerRawRequest test requesting data in asynchronous way.
+func (test *TestClientSuite) Test_15_DealerRawRequest() {
+	require := test.Require
+
+	go test.runBackend(test.socket.url, test.socket.target)
+	time.Sleep(time.Millisecond * 100)
+
+	socket, err := NewRaw(zmq.ROUTER, "inproc://sample_router")
+	require().NoError(err)
+	test.socket = socket
+	test.socket.socketType = zmq.DEALER
+
+	// Set minimal timeout and attempt for fast testing
+	test.socket.Timeout(time.Second).Attempt(minAttempt)
+
+	req := "hello Test_15_DealerRawRequest"
+	reply, err := test.socket.RawRequest(req)
+	require().NoError(err)
+	fmt.Printf("client recevied: %s\n", reply)
+
+}
+
+// Test_16_DealerRawSubmit test submitting the message in request way.
+func (test *TestClientSuite) Test_16_DealerRawSubmit() {
+	require := test.Require
+
+	go test.runBackend(test.socket.url, test.socket.target)
+	time.Sleep(time.Millisecond * 100)
+
+	socket, err := NewRaw(zmq.ROUTER, "inproc://sample_router")
+	require().NoError(err)
+	test.socket = socket
+	test.socket.socketType = zmq.DEALER
+	// Set minimal timeout and attempt for fast testing
+	test.socket.Timeout(time.Second).Attempt(minAttempt)
+
+	req := "hello Test_16_DealerRawSubmit"
+	err = test.socket.RawSubmit(req)
 	require().NoError(err)
 
 	// The backend closed
@@ -163,7 +211,6 @@ func (test *TestClientSuite) Test_14_RawSubmit() {
 
 	// The second submitting must fail since backend is not replying.
 	err = test.socket.RawSubmit(req)
-	fmt.Printf("error: %v\n", err)
 	require().Error(err)
 }
 
