@@ -3,6 +3,7 @@ package client
 
 import (
 	"fmt"
+	"github.com/ahmetson/client-lib/config"
 	"time"
 
 	"github.com/ahmetson/common-lib/message"
@@ -19,6 +20,7 @@ type Socket struct {
 	attempt    uint8
 	socketType zmq.Type
 	target     zmq.Type
+	config     *config.Client
 }
 
 // Attempts to connect to the endpoint.
@@ -46,9 +48,20 @@ func (socket *Socket) reconnect() error {
 	}
 
 	socket.poller = zmq.NewPoller()
-	socket.poller.Add(socket.zmqSocket, zmq.POLLIN)
 
 	return nil
+}
+
+func (socket *Socket) pollIn(update bool) {
+	if update {
+		_, _ = socket.poller.UpdateBySocket(socket.zmqSocket, zmq.POLLIN)
+	} else {
+		_ = socket.poller.Add(socket.zmqSocket, zmq.POLLIN)
+	}
+}
+
+func (socket *Socket) pollOut() {
+	_ = socket.poller.Add(socket.zmqSocket, zmq.POLLOUT)
 }
 
 // Close the zmqSocket free the port and resources.
@@ -61,8 +74,8 @@ func (socket *Socket) Close() error {
 	return nil
 }
 
-// New client based on the target
-func New(target zmq.Type, url string) (*Socket, error) {
+// NewRaw client based on the target
+func NewRaw(target zmq.Type, url string) (*Socket, error) {
 	if !IsTarget(target) {
 		return nil, fmt.Errorf("target is not supported")
 	}
@@ -74,6 +87,31 @@ func New(target zmq.Type, url string) (*Socket, error) {
 		target:     target,
 		socketType: socketType,
 		url:        url,
+		config:     nil,
+	}
+
+	return socket, nil
+}
+
+// New client based on the configuration
+func New(client *config.Client) (*Socket, error) {
+	if !IsTarget(client.TargetType) {
+		return nil, fmt.Errorf("target is not supported")
+	}
+	url := client.Url()
+	if len(url) == 0 {
+		return nil, fmt.Errorf("url not set. context not linked")
+	}
+
+	socketType := SocketType(client.TargetType)
+	socket := &Socket{
+		zmqSocket:  nil,
+		timeout:    time.Second * 10,
+		attempt:    5,
+		target:     client.TargetType,
+		socketType: socketType,
+		url:        url,
+		config:     client,
 	}
 
 	return socket, nil
@@ -131,6 +169,9 @@ func (socket *Socket) Request(req *message.Request) (*message.Reply, error) {
 	}
 
 	rawReply, err := socket.RawRequest(reqStr)
+	if err != nil {
+		return nil, fmt.Errorf("socket.RawRequest: %w", err)
+	}
 
 	reply, err := message.ParseReply(rawReply)
 	if err != nil {
@@ -143,26 +184,83 @@ func (socket *Socket) Request(req *message.Request) (*message.Reply, error) {
 	return &reply, nil
 }
 
-func (socket *Socket) RawRequest(raw string) ([]string, error) {
+func (socket *Socket) Submit(req *message.Request) error {
+	reqStr, err := req.String()
+	if err != nil {
+		return fmt.Errorf("request.String: %w", err)
+	}
+
+	err = socket.RawSubmit(reqStr)
+	if err != nil {
+		return fmt.Errorf("socket.RawRequest: %w", err)
+	}
+
+	return nil
+}
+
+func (socket *Socket) RawSubmit(raw string) error {
 	err := socket.reconnect()
 	if err != nil {
-		return nil, fmt.Errorf("zmqSocket connection: %w", err)
+		return fmt.Errorf("initial  socket.reconnect: %w", err)
 	}
+
+	socket.pollOut()
 
 	attempt := socket.attempt
 
-	// we attempt requests for an infinite amount of time.
+	messages := []string{raw}
+	if socket.socketType == zmq.DEALER {
+		messages = []string{"", raw}
+	}
+
 	for {
-		if socket.socketType == zmq.DEALER {
+		// Poll zmqSocket for a reply, with timeout
+		sockets, err := socket.poller.Poll(socket.timeout)
+		if err != nil {
+			return fmt.Errorf("poll error: %w", err)
+		}
+
+		if len(sockets) > 0 {
 			//  We send a request, then we work to get a reply
-			if _, err := socket.zmqSocket.SendMessage("", raw); err != nil {
-				return nil, fmt.Errorf("failed to send the message. zmqSocket error: %w", err)
+			if _, err := socket.zmqSocket.SendMessageDontwait(messages); err != nil {
+				return fmt.Errorf("zmqSocket.SendMessage: %w", err)
 			}
-		} else {
-			//  We send a request, then we work to get a reply
-			if _, err := socket.zmqSocket.SendMessage(raw); err != nil {
-				return nil, fmt.Errorf("failed to send the message. zmqSocket error: %w", err)
-			}
+
+			return nil
+		}
+
+		err = socket.reconnect()
+		if err != nil {
+			return fmt.Errorf("zmqSocket.reconnect: %w", err)
+		}
+
+		socket.pollOut()
+
+		attempt--
+		if attempt == 0 {
+			return fmt.Errorf("timeout")
+		}
+	}
+}
+
+func (socket *Socket) RawRequest(raw string) ([]string, error) {
+	err := socket.RawSubmit(raw)
+	if err != nil {
+		return nil, fmt.Errorf("socket.RawSubmit: %w", err)
+	}
+	socket.pollIn(true)
+
+	attempt := socket.attempt
+
+	messages := []string{raw}
+	if socket.socketType == zmq.DEALER {
+		messages = []string{"", raw}
+	}
+
+	for {
+		//  We send a request, then we work to get a reply
+		if _, err := socket.zmqSocket.SendMessage(messages); err != nil {
+			return nil, fmt.Errorf("zmqSocket.SendMessage: %w", err)
 		}
 
 		// Poll zmqSocket for a reply, with timeout
@@ -175,31 +273,21 @@ func (socket *Socket) RawRequest(raw string) ([]string, error) {
 			// Wait for a reply.
 			r, err := socket.zmqSocket.RecvMessage(0)
 			if err != nil {
-				return nil, fmt.Errorf("failed to message. zmqSocket error: %w", err)
+				return nil, fmt.Errorf("zmqSocket.RecvMessage: %w", err)
 			}
 
 			return r, nil
-		} else {
-			err := socket.reconnect()
-			if err != nil {
-				return nil, fmt.Errorf("zmqSocket.inproc_reconnect: %w", err)
-			}
+		}
+		err = socket.reconnect()
+		if err != nil {
+			return nil, fmt.Errorf("zmqSocket.reconnect: %w", err)
+		}
 
-			attempt--
-			if attempt == 0 {
-				return nil, fmt.Errorf("timeout")
-			}
+		socket.pollIn(false)
+
+		attempt--
+		if attempt == 0 {
+			return nil, fmt.Errorf("timeout")
 		}
 	}
-}
-
-// Url creates url of the server for the client to connect
-//
-// If the port is 0, then the client will be inproc, not as tcp
-func Url(name string, port uint64) string {
-	if port == 0 {
-		return fmt.Sprintf("inproc://%s", name)
-	}
-	url := fmt.Sprintf("tcp://localhost:%d", port)
-	return url
 }
