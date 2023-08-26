@@ -3,6 +3,9 @@ This is the client module.
 The client is the socket that connects to the 
 Handler Instances.
 
+> Tested with zmq.ROUTER and zmq.REP.
+> To test with other sockets, add them in the `handler-lib`.
+
 ## Rules
 * Client has options
 * - *timeout* &ndash; of the request in milliseconds
