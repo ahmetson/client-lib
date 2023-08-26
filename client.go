@@ -95,24 +95,16 @@ func NewRaw(target zmq.Type, url string) (*Socket, error) {
 
 // New client based on the configuration
 func New(client *config.Client) (*Socket, error) {
-	if !IsTarget(client.TargetType) {
-		return nil, fmt.Errorf("target is not supported")
-	}
 	url := client.Url()
 	if len(url) == 0 {
 		return nil, fmt.Errorf("url not set. context not linked")
 	}
 
-	socketType := SocketType(client.TargetType)
-	socket := &Socket{
-		zmqSocket:  nil,
-		timeout:    time.Second * 10,
-		attempt:    5,
-		target:     client.TargetType,
-		socketType: socketType,
-		url:        url,
-		config:     client,
+	socket, err := NewRaw(client.TargetType, url)
+	if err != nil {
+		return nil, fmt.Errorf("newRaw('%s', '%s'): %w", client.TargetType.String(), url, err)
 	}
+	socket.config = client
 
 	return socket, nil
 }
