@@ -178,7 +178,7 @@ func (socket *Socket) Submit(req *message.Request) error {
 	return nil
 }
 
-// rawSubmit sends the message.
+// rawSubmit sends the message; it doesn't wait for a reply to see was it successfully sent.
 func (socket *Socket) rawSubmit(raw string) error {
 	err := socket.reconnect()
 	if err != nil {
