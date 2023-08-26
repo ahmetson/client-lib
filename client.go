@@ -10,6 +10,11 @@ import (
 	zmq "github.com/pebbe/zmq4"
 )
 
+const (
+	minTimeout = time.Millisecond * 2
+	minAttempt = uint8(1)
+)
+
 // Socket is the wrapper around zeromq's zmqSocket.
 // The zmqSocket is the client's zmqSocket that will try to interact with the client service.
 type Socket struct {
@@ -110,8 +115,8 @@ func New(client *config.Client) (*Socket, error) {
 }
 
 func (socket *Socket) Timeout(timeout time.Duration) *Socket {
-	if timeout < time.Millisecond*2 {
-		timeout = time.Millisecond
+	if timeout < minTimeout {
+		timeout = minTimeout
 	}
 
 	socket.timeout = timeout
@@ -119,8 +124,8 @@ func (socket *Socket) Timeout(timeout time.Duration) *Socket {
 }
 
 func (socket *Socket) Attempt(attempt uint8) *Socket {
-	if attempt < 1 {
-		attempt = 1
+	if attempt < minAttempt {
+		attempt = minAttempt
 	}
 
 	socket.attempt = attempt
