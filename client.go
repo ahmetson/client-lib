@@ -79,7 +79,7 @@ func NewRaw(target zmq.Type, url string) (*Socket, error) {
 	if !config.IsTarget(target) {
 		return nil, fmt.Errorf("target is not supported")
 	}
-	socketType := config.SocketType(target)
+	socketType := config.TargetToClient(target)
 	socket := &Socket{
 		zmqSocket:  nil,
 		timeout:    time.Second * 10,

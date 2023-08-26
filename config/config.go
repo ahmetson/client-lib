@@ -57,8 +57,8 @@ func IsTarget(target zmq.Type) bool {
 	return target == zmq.REP || target == zmq.ROUTER || target == zmq.PUB || target == zmq.PUSH || target == zmq.PULL
 }
 
-// SocketType gets the ZMQ analog of the handler type for the clients
-func SocketType(target zmq.Type) zmq.Type {
+// TargetToClient gets the ZMQ counter-part of the target
+func TargetToClient(target zmq.Type) zmq.Type {
 	switch target {
 	case zmq.PUB:
 		return zmq.SUB
