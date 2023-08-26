@@ -27,8 +27,9 @@ func New(serviceUrl string, id string, port uint64, socketType zmq.Type) *Client
 }
 
 // UrlFunc sets the context to generate the url
-func (client *Client) UrlFunc(urlFunc func(*Client) string) {
+func (client *Client) UrlFunc(urlFunc func(*Client) string) *Client {
 	client.urlFunc = urlFunc
+	return client
 }
 
 // Url of the client
