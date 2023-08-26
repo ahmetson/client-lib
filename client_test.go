@@ -146,8 +146,6 @@ func (test *TestClientSuite) Test_13_RawRequest() {
 }
 
 // Test_14_RawSubmit test submitting the message.
-// If the client is request, then
-// the second request must fail as there is no reply.
 func (test *TestClientSuite) Test_14_RawSubmit() {
 	require := test.Require
 
