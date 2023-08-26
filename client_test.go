@@ -122,8 +122,8 @@ func (test *TestClientSuite) Test_11_Parameters() {
 	require().EqualValues(minAttempt, test.socket.attempt)
 }
 
-// Test_12_SubmitRaw test submitting the message.
-func (test *TestClientSuite) Test_12_submitRaw() {
+// Test_12_rawSubmit test submitting the message.
+func (test *TestClientSuite) Test_12_rawSubmit() {
 	require := test.Require
 
 	go test.runBackend(test.socket.url, test.socket.target)
@@ -131,6 +131,18 @@ func (test *TestClientSuite) Test_12_submitRaw() {
 	req := "hello"
 	err := test.socket.rawSubmit(req)
 	require().NoError(err)
+}
+
+// Test_13_RawRequest test requesting data.
+func (test *TestClientSuite) Test_13_RawRequest() {
+	require := test.Require
+
+	go test.runBackend(test.socket.url, test.socket.target)
+
+	req := "hello"
+	reply, err := test.socket.RawRequest(req)
+	require().NoError(err)
+	fmt.Printf("client recevied: %s\n", reply)
 }
 
 // In order for 'go test' to run this suite, we need to create
