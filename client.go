@@ -76,10 +76,10 @@ func (socket *Socket) Close() error {
 
 // NewRaw client based on the target
 func NewRaw(target zmq.Type, url string) (*Socket, error) {
-	if !IsTarget(target) {
+	if !config.IsTarget(target) {
 		return nil, fmt.Errorf("target is not supported")
 	}
-	socketType := SocketType(target)
+	socketType := config.SocketType(target)
 	socket := &Socket{
 		zmqSocket:  nil,
 		timeout:    time.Second * 10,
@@ -107,25 +107,6 @@ func New(client *config.Client) (*Socket, error) {
 	socket.config = client
 
 	return socket, nil
-}
-
-func IsTarget(target zmq.Type) bool {
-	return target == zmq.REP || target == zmq.ROUTER || target == zmq.PUB || target == zmq.PUSH || target == zmq.PULL
-}
-
-// SocketType gets the ZMQ analog of the handler type for the clients
-func SocketType(target zmq.Type) zmq.Type {
-	switch target {
-	case zmq.PUB:
-		return zmq.SUB
-	case zmq.PUSH:
-		return zmq.PULL
-	case zmq.PULL:
-		return zmq.PUSH
-	default:
-		// For zmq.REP and zmq.ROUTER
-		return zmq.REQ
-	}
 }
 
 func (socket *Socket) Timeout(timeout time.Duration) *Socket {

@@ -50,3 +50,22 @@ func Url(id string, port uint64) string {
 	url := fmt.Sprintf("tcp://localhost:%d", port)
 	return url
 }
+
+func IsTarget(target zmq.Type) bool {
+	return target == zmq.REP || target == zmq.ROUTER || target == zmq.PUB || target == zmq.PUSH || target == zmq.PULL
+}
+
+// SocketType gets the ZMQ analog of the handler type for the clients
+func SocketType(target zmq.Type) zmq.Type {
+	switch target {
+	case zmq.PUB:
+		return zmq.SUB
+	case zmq.PUSH:
+		return zmq.PULL
+	case zmq.PULL:
+		return zmq.PUSH
+	default:
+		// For zmq.REP and zmq.ROUTER
+		return zmq.REQ
+	}
+}
