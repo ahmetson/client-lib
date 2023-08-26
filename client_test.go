@@ -4,6 +4,7 @@ import (
 	"github.com/ahmetson/client-lib/config"
 	zmq "github.com/pebbe/zmq4"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/suite"
 )
@@ -46,6 +47,24 @@ func (test *TestClientSuite) Test_10_New() {
 	client.UrlFunc(config.Url)
 	_, err = New(client)
 	require().NoError(err)
+}
+
+// Test_11_Parameters tests setting socket parameters such as timeout and attempts
+func (test *TestClientSuite) Test_11_Parameters() {
+	require := test.Require
+
+	timeout := time.Millisecond // less than min
+	attempt := uint8(0)
+
+	require().Less(timeout, minTimeout, "set less than minTimeout")
+	require().Less(attempt, minAttempt, "set less than minAttempt")
+
+	// Setting a value less than minimal value should set to min
+	test.socket.Timeout(timeout).Attempt(attempt)
+
+	// The timeout must be minimal values
+	require().EqualValues(minTimeout, test.socket.timeout)
+	require().EqualValues(minAttempt, test.socket.attempt)
 }
 
 // In order for 'go test' to run this suite, we need to create
