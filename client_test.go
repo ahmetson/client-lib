@@ -145,6 +145,30 @@ func (test *TestClientSuite) Test_13_RawRequest() {
 	fmt.Printf("client recevied: %s\n", reply)
 }
 
+// Test_14_RawSubmit test submitting the message.
+// If the client is request, then
+// the second request must fail as there is no reply.
+func (test *TestClientSuite) Test_14_RawSubmit() {
+	require := test.Require
+
+	go test.runBackend(test.socket.url, test.socket.target)
+
+	req := "hello"
+	err := test.socket.RawSubmit(req)
+	require().NoError(err)
+
+	// The backend closed
+	time.Sleep(time.Millisecond * 10)
+
+	// Set minimal timeout and attempt for fast testing
+	test.socket.Timeout(minTimeout).Attempt(minAttempt)
+
+	// The second submitting must fail since backend is not replying.
+	err = test.socket.RawSubmit(req)
+	fmt.Printf("error: %v\n", err)
+	require().Error(err)
+}
+
 // In order for 'go test' to run this suite, we need to create
 // a normal test function and pass our suite to suite.Run
 func TestClient(t *testing.T) {
