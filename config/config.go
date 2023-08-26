@@ -15,9 +15,10 @@ type Client struct {
 	urlFunc    func(*Client) string
 }
 
-func New(url string, id string, port uint64, socketType zmq.Type) *Client {
+// New Client
+func New(serviceUrl string, id string, port uint64, socketType zmq.Type) *Client {
 	return &Client{
-		ServiceUrl: url,
+		ServiceUrl: serviceUrl,
 		Id:         id,
 		Port:       port,
 		TargetType: socketType,
@@ -51,6 +52,7 @@ func Url(id string, port uint64) string {
 	return url
 }
 
+// IsTarget checks that given zeromq socket type is the handler type
 func IsTarget(target zmq.Type) bool {
 	return target == zmq.REP || target == zmq.ROUTER || target == zmq.PUB || target == zmq.PUSH || target == zmq.PULL
 }
