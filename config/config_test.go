@@ -1,64 +1,77 @@
 package config
 
 import (
-	"github.com/ahmetson/log-lib"
-	"testing"
-	"time"
-
+	zmq "github.com/pebbe/zmq4"
 	"github.com/stretchr/testify/suite"
+	"testing"
 )
 
 // Define the suite, and absorb the built-in basic suite
 // functionality from testify - including a T() method which
 // returns the current testing orchestra
-type TestBroadcastSuite struct {
+type TestConfigSuite struct {
 	suite.Suite
-	appConfig *Config
+	client *Client
 }
 
 // Make sure that Account is set to five
 // before each test
-func (suite *TestBroadcastSuite) SetupTest() {
-	logger, err := log.New("request", true)
-	suite.Require().NoError(err)
-
-	appConfig, err := New(logger)
-	suite.Require().NoError(err)
-
-	suite.appConfig = appConfig
+func (test *TestConfigSuite) SetupTest() {
+	serviceUrl := "github.com/ahmetson/service"
+	id := "sample"
+	port := uint64(0)
+	socketType := zmq.REQ
+	test.client = New(serviceUrl, id, port, socketType)
 }
 
-// All methods that begin with "Test" are run as tests within a
-// suite.
-func (suite *TestBroadcastSuite) TestDefaultValues() {
-	suite.Require().Equal(DefaultTimeout, RequestTimeout(suite.appConfig))
-	suite.Require().Equal(DefaultAttempt, Attempt(suite.appConfig))
+// Test_10_IsTarget checks the target zeromq sockets are supported
+//
+// Version 1 supported sockets:
+//
+//	zmq.REP || zmq.ROUTER || zmq.PUB || zmq.PUSH || zmq.PULL
+func (test *TestConfigSuite) Test_10_IsTarget() {
+	require := test.Require
+	require().True(IsTarget(zmq.REP))
+	require().True(IsTarget(zmq.ROUTER))
+	require().True(IsTarget(zmq.PUB))
+	require().True(IsTarget(zmq.PUSH))
+	require().True(IsTarget(zmq.PULL))
+
+	// Invalid
+	require().False(IsTarget(zmq.REQ))
 }
 
-func (suite *TestBroadcastSuite) TestZeroes() {
-	suite.appConfig.SetDefault("SDS_REQUEST_TIMEOUT", uint64(0))
-	suite.appConfig.SetDefault("SDS_REQUEST_ATTEMPT", uint64(0))
+// Test_11_TargetToClient checks client socket derivation from target.
+func (test *TestConfigSuite) Test_11_TargetToClient() {
+	require := test.Require
 
-	suite.Require().Equal(DefaultTimeout, RequestTimeout(suite.appConfig))
-	suite.Require().Equal(DefaultAttempt, Attempt(suite.appConfig))
+	require().Equal(zmq.REQ, TargetToClient(zmq.REP))
+	require().Equal(zmq.REQ, TargetToClient(zmq.ROUTER))
+	require().Equal(zmq.SUB, TargetToClient(zmq.PUB))
+	require().Equal(zmq.PULL, TargetToClient(zmq.PUSH))
+	require().Equal(zmq.PUSH, TargetToClient(zmq.PULL))
 
-	suite.appConfig.SetDefault("SDS_REQUEST_TIMEOUT", "not a number")
-	suite.Require().Equal(DefaultTimeout, RequestTimeout(suite.appConfig))
-
-	suite.appConfig.SetDefault("SDS_REQUEST_TIMEOUT", 74.65)
-	suite.Require().Equal(time.Second*74, RequestTimeout(suite.appConfig))
+	// Invalid socket types return request
+	require().Equal(zmq.REQ, TargetToClient(zmq.REQ))
+	require().Equal(zmq.REQ, TargetToClient(zmq.DEALER))
 }
 
-func (suite *TestBroadcastSuite) TestValid() {
-	suite.appConfig.SetDefault("SDS_REQUEST_TIMEOUT", uint64(5))
-	suite.appConfig.SetDefault("SDS_REQUEST_ATTEMPT", uint64(10))
+// Test_12_Url tests the url generation
+func (test *TestConfigSuite) Test_12_Url() {
+	require := test.Require
 
-	suite.Require().Equal(time.Second*5, RequestTimeout(suite.appConfig))
-	suite.Require().Equal(uint(10), Attempt(suite.appConfig))
+	// No url function was set, url must be empty
+	require().Empty(test.client.Url())
+
+	// Setting up the url function
+	test.client.UrlFunc(Url)
+
+	// Url is generated
+	require().NotEmpty(test.client.Url())
 }
 
 // In order for 'go test' to run this suite, we need to create
 // a normal test function and pass our suite to suite.Run
-func TestParameter(t *testing.T) {
-	suite.Run(t, new(TestBroadcastSuite))
+func TestConfig(t *testing.T) {
+	suite.Run(t, new(TestConfigSuite))
 }
