@@ -232,17 +232,7 @@ func (socket *Socket) RawRequest(raw string) ([]string, error) {
 
 	attempt := socket.attempt
 
-	messages := []string{raw}
-	if socket.socketType == zmq.DEALER {
-		messages = []string{"", raw}
-	}
-
 	for {
-		//  We send a request, then we work to get a reply
-		if _, err := socket.zmqSocket.SendMessage(messages); err != nil {
-			return nil, fmt.Errorf("zmqSocket.SendMessage: %w", err)
-		}
-
 		// Poll zmqSocket for a reply, with timeout
 		sockets, err := socket.poller.Poll(socket.timeout)
 		if err != nil {
