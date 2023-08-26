@@ -44,11 +44,11 @@ func (client *Client) Url() string {
 //
 // If the port is 0, then the client will be inproc, not as tcp
 // todo move to context
-func Url(id string, port uint64) string {
-	if port == 0 {
-		return fmt.Sprintf("inproc://%s", id)
+func Url(client *Client) string {
+	if client.Port == 0 {
+		return fmt.Sprintf("inproc://%s", client.Id)
 	}
-	url := fmt.Sprintf("tcp://localhost:%d", port)
+	url := fmt.Sprintf("tcp://localhost:%d", client.Port)
 	return url
 }
 
@@ -57,7 +57,9 @@ func IsTarget(target zmq.Type) bool {
 	return target == zmq.REP || target == zmq.ROUTER || target == zmq.PUB || target == zmq.PUSH || target == zmq.PULL
 }
 
-// TargetToClient gets the ZMQ counter-part of the target
+// TargetToClient gets the ZMQ counter-part of the target.
+// Returns zmq.REQ if target is not supported.
+// Returns zmq.REQ for zmq.ROUTER and zmq.REP
 func TargetToClient(target zmq.Type) zmq.Type {
 	switch target {
 	case zmq.PUB:
