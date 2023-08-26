@@ -8,10 +8,10 @@ import (
 
 // A Client parameters to connect to the dep
 type Client struct {
-	ServiceUrl string // Url link of the service
-	Id         string
-	Port       uint64
-	TargetType zmq.Type // The service's socket type
+	ServiceUrl string   `json:"url"` // Url link of the service
+	Id         string   `json:"id"`
+	Port       uint64   `json:"port"`
+	TargetType zmq.Type `json:"zmq_type,omitempty"` // The service's socket type
 	urlFunc    func(*Client) string
 }
 
