@@ -1,6 +1,7 @@
 package client
 
 import (
+	"fmt"
 	"github.com/ahmetson/client-lib/config"
 	zmq "github.com/pebbe/zmq4"
 	"testing"
@@ -17,7 +18,8 @@ import (
 type TestClientSuite struct {
 	suite.Suite
 
-	socket *Socket
+	socket  *Socket
+	backend *zmq.Socket
 }
 
 func (test *TestClientSuite) SetupTest() {
@@ -27,6 +29,59 @@ func (test *TestClientSuite) SetupTest() {
 	require().NoError(err)
 
 	test.socket = socket
+}
+
+func (test *TestClientSuite) TearDownTest() {
+	require := test.Require
+
+	if test.backend != nil {
+		require().NoError(test.backend.Close())
+	}
+
+	if test.socket.zmqSocket != nil {
+		require().NoError(test.socket.Close())
+	}
+}
+
+// runBackend to imitate the backend as a goroutine.
+func (test *TestClientSuite) runBackend(url string, zmqType zmq.Type) {
+	fmt.Printf("backend running...\n")
+	require := test.Require
+
+	var err error
+	test.backend, err = zmq.NewSocket(zmqType)
+	require().NoError(err)
+
+	fmt.Printf("backend bind to %s\n", url)
+	err = test.backend.Bind(url)
+	require().NoError(err)
+
+	fmt.Printf("backend waits for messages...\n")
+	msg, err := test.backend.RecvMessage(0)
+	require().NoError(err)
+
+	fmt.Printf("backend received: %s\n", msg)
+	var reply []string
+	if len(msg) >= 3 {
+		reply = []string{msg[0], msg[1], fmt.Sprintf("reply to '%s'", msg[2])}
+	} else if len(msg) >= 2 {
+		reply = []string{msg[0], fmt.Sprintf("reply to '%s'", msg[1])}
+	} else {
+		reply = []string{fmt.Sprintf("reply to '%s'", msg[0])}
+	}
+
+	fmt.Printf("backend replies: %s\n", reply)
+
+	_, err = test.backend.SendMessage(reply)
+	require().NoError(err)
+
+	fmt.Printf("backend replied: %s\n", reply)
+	err = test.backend.Close()
+	require().NoError(err)
+
+	fmt.Printf("backed closed!\n")
+
+	test.backend = nil
 }
 
 // Test_10_New tests creation of the client
@@ -65,6 +120,17 @@ func (test *TestClientSuite) Test_11_Parameters() {
 	// The timeout must be minimal values
 	require().EqualValues(minTimeout, test.socket.timeout)
 	require().EqualValues(minAttempt, test.socket.attempt)
+}
+
+// Test_12_SubmitRaw test submitting the message.
+func (test *TestClientSuite) Test_12_submitRaw() {
+	require := test.Require
+
+	go test.runBackend(test.socket.url, test.socket.target)
+
+	req := "hello"
+	err := test.socket.rawSubmit(req)
+	require().NoError(err)
 }
 
 // In order for 'go test' to run this suite, we need to create
