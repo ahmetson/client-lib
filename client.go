@@ -114,6 +114,7 @@ func New(client *config.Client) (*Socket, error) {
 	return socket, nil
 }
 
+// Timeout update. If the timeout is less than minTimeout, then minTimeout is set
 func (socket *Socket) Timeout(timeout time.Duration) *Socket {
 	if timeout < minTimeout {
 		timeout = minTimeout
@@ -123,6 +124,7 @@ func (socket *Socket) Timeout(timeout time.Duration) *Socket {
 	return socket
 }
 
+// Attempt update. If the attempt is less than minAttempt, then minAttempt is set
 func (socket *Socket) Attempt(attempt uint8) *Socket {
 	if attempt < minAttempt {
 		attempt = minAttempt
