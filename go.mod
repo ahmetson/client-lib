@@ -4,8 +4,6 @@ go 1.19
 
 replace github.com/ahmetson/common-lib => D:/sds/common-lib
 
-replace github.com/ahmetson/os-lib => D:/sds/os-lib
-
 require (
 	github.com/ahmetson/common-lib v0.0.0-20230717140750-5e95e61d69c2
 	github.com/stretchr/testify v1.8.2
