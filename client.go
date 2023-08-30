@@ -71,6 +71,9 @@ func (socket *Socket) pollOut() {
 
 // Close the zmqSocket free the port and resources.
 func (socket *Socket) Close() error {
+	if socket.zmqSocket == nil {
+		return nil
+	}
 	err := socket.zmqSocket.Close()
 	if err != nil {
 		return fmt.Errorf("error closing zmqSocket: %w", err)
