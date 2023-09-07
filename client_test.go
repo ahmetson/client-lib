@@ -205,13 +205,6 @@ func (test *TestClientSuite) Test_16_DealerRawSubmit() {
 
 	// The backend closed
 	time.Sleep(time.Millisecond * 10)
-
-	// Set minimal timeout and attempt for fast testing
-	test.socket.Timeout(minTimeout).Attempt(minAttempt)
-
-	// The second submitting must fail since backend is not replying.
-	err = test.socket.RawSubmit(req)
-	require().Error(err)
 }
 
 // In order for 'go test' to run this suite, we need to create

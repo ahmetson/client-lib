@@ -231,14 +231,6 @@ func (socket *Socket) rawSubmit(raw string) error {
 // If the socket has to wait for a reply, otherwise its blocking,
 // then the RawSubmit will receive the message, but omit it.
 func (socket *Socket) RawSubmit(raw string) error {
-	if socket.socketType == zmq.REQ || socket.socketType == zmq.DEALER {
-		_, err := socket.RawRequest(raw)
-		if err != nil {
-			return fmt.Errorf("socket.RawSocket: %w", err)
-		}
-		return nil
-	}
-
 	err := socket.rawSubmit(raw)
 	if err != nil {
 		return fmt.Errorf("socket.rawSubmit: %w", err)
