@@ -1,3 +1,5 @@
+github.com/ahmetson/common-lib v0.0.0-20230825195825-e7b69549b9a1 h1:kcw97M9jxESS9hULBxd/c3Q60VvwYXxxg9wLStINt4g=
+github.com/ahmetson/common-lib v0.0.0-20230825195825-e7b69549b9a1/go.mod h1:33pBXMtRGX5Xseh5t9t9xfo8jaeHNkE3yYyNRdXoY3Y=
 github.com/btcsuite/btcd/btcec/v2 v2.2.1 h1:xP60mv8fvp+0khmrN0zTdPC3cNm24rfeE6lh2R/Yv3E=
 github.com/btcsuite/btcd/btcec/v2 v2.2.1/go.mod h1:9/CSmJxmuvqzX9Wh2fXMWToLOHhPd11lSPuIupwTkI8=
 github.com/btcsuite/btcd/chaincfg/chainhash v1.0.1 h1:q0rUy8C/TYNBQS1+CGKw68tLOFYSNEs0TFnxxnS9+4U=

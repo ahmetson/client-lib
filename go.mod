@@ -2,10 +2,8 @@ module github.com/ahmetson/client-lib
 
 go 1.19
 
-replace github.com/ahmetson/common-lib => D:/sds/common-lib
-
 require (
-	github.com/ahmetson/common-lib v0.0.0-20230717140750-5e95e61d69c2
+	github.com/ahmetson/common-lib v0.0.0-20230825195825-e7b69549b9a1
 	github.com/stretchr/testify v1.8.2
 )
 
