@@ -57,16 +57,12 @@ func (socket *Socket) reconnect() error {
 	return nil
 }
 
-func (socket *Socket) pollIn(update bool) {
-	if update {
-		_, _ = socket.poller.UpdateBySocket(socket.zmqSocket, zmq.POLLIN)
-	} else {
-		_ = socket.poller.Add(socket.zmqSocket, zmq.POLLIN)
-	}
+func (socket *Socket) updateToPollIn() {
+	_, _ = socket.poller.UpdateBySocket(socket.zmqSocket, zmq.POLLIN)
 }
 
 func (socket *Socket) pollOut() {
-	_ = socket.poller.Add(socket.zmqSocket, zmq.POLLOUT)
+	_ = socket.poller.Add(socket.zmqSocket, zmq.POLLOUT|zmq.POLLIN)
 }
 
 // Close the zmqSocket free the port and resources.
@@ -182,73 +178,86 @@ func (socket *Socket) Submit(req *message.Request) error {
 }
 
 // rawSubmit sends the message; it doesn't wait for a reply to see was it successfully sent.
-func (socket *Socket) rawSubmit(raw string) error {
+//
+// returns if timeout or not.
+func (socket *Socket) rawSubmit(raw string) (bool, error) {
 	err := socket.reconnect()
 	if err != nil {
-		return fmt.Errorf("initial  socket.reconnect: %w", err)
+		return false, fmt.Errorf("initial  socket.reconnect: %w", err)
 	}
 
 	socket.pollOut()
-
-	attempt := socket.attempt
 
 	messages := []string{raw}
 	if socket.socketType == zmq.DEALER {
 		messages = []string{"", raw}
 	}
 
-	for {
-		// Poll zmqSocket for a reply, with timeout
-		sockets, err := socket.poller.Poll(socket.timeout)
-		if err != nil {
-			return fmt.Errorf("poll error: %w", err)
-		}
-
-		if len(sockets) > 0 {
-			//  We send a request, then we work to get a reply
-			if _, err := socket.zmqSocket.SendMessageDontwait(messages); err != nil {
-				return fmt.Errorf("zmqSocket.SendMessage: %w", err)
-			}
-
-			return nil
-		}
-
-		err = socket.reconnect()
-		if err != nil {
-			return fmt.Errorf("zmqSocket.reconnect: %w", err)
-		}
-
-		socket.pollOut()
-
-		attempt--
-		if attempt == 0 {
-			return fmt.Errorf("timeout")
-		}
+	// Poll zmqSocket for a reply, with timeout
+	sockets, err := socket.poller.Poll(socket.timeout)
+	if err != nil {
+		return false, fmt.Errorf("poll error: %w", err)
 	}
+
+	if len(sockets) > 0 {
+		//  We send a request, then we work to get a reply
+		if _, err := socket.zmqSocket.SendMessageDontwait(messages); err != nil {
+			return false, fmt.Errorf("zmqSocket.SendMessage: %w", err)
+		}
+
+		// message received without a timeout
+		return false, nil
+	}
+
+	return true, nil
 }
 
 // RawSubmit sends the message to the destination, without waiting for the reply.
 // If the socket has to wait for a reply, otherwise its blocking,
 // then the RawSubmit will receive the message, but omit it.
 func (socket *Socket) RawSubmit(raw string) error {
-	err := socket.rawSubmit(raw)
-	if err != nil {
-		return fmt.Errorf("socket.rawSubmit: %w", err)
-	}
+	attempt := socket.attempt
 
+	for {
+		timeout, err := socket.rawSubmit(raw)
+		if err != nil {
+			return fmt.Errorf("socket.rawSubmit: %w", err)
+		}
+
+		if !timeout {
+			break
+		}
+
+		attempt--
+		if attempt == 0 {
+			return fmt.Errorf("submit timeout")
+		}
+	}
 	return nil
 }
 
 func (socket *Socket) RawRequest(raw string) ([]string, error) {
-	err := socket.rawSubmit(raw)
-	if err != nil {
-		return nil, fmt.Errorf("socket.rawSubmit: %w", err)
-	}
-	socket.pollIn(true)
-
-	attempt := socket.attempt
+	// Since we decrement before an attempt, it will be 0
+	// If we had 1 attempt.
+	attempt := socket.attempt + 1
 
 	for {
+		attempt--
+		if attempt == 0 {
+			return nil, fmt.Errorf("timeout")
+		}
+
+		timeout, err := socket.rawSubmit(raw)
+		if err != nil {
+			return nil, fmt.Errorf("socket.rawSubmit: %w", err)
+		}
+
+		if timeout {
+			continue
+		}
+
+		socket.updateToPollIn()
+
 		// Poll zmqSocket for a reply, with timeout
 		sockets, err := socket.poller.Poll(socket.timeout)
 		if err != nil {
@@ -263,17 +272,6 @@ func (socket *Socket) RawRequest(raw string) ([]string, error) {
 			}
 
 			return r, nil
-		}
-		err = socket.reconnect()
-		if err != nil {
-			return nil, fmt.Errorf("zmqSocket.reconnect: %w", err)
-		}
-
-		socket.pollIn(false)
-
-		attempt--
-		if attempt == 0 {
-			return nil, fmt.Errorf("timeout")
 		}
 	}
 }
