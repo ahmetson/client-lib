@@ -18,8 +18,9 @@ import (
 type TestClientSuite struct {
 	suite.Suite
 
-	socket  *Socket
-	backend *zmq.Socket
+	socket   *Socket
+	backend  *zmq.Socket
+	funcName string
 }
 
 func (test *TestClientSuite) SetupTest() {
@@ -41,29 +42,28 @@ func (test *TestClientSuite) TearDownTest() {
 	if test.socket.zmqSocket != nil {
 		require().NoError(test.socket.Close())
 	}
+
+	time.Sleep(time.Millisecond * 100)
 }
 
 // runBackend to imitate the backend as a goroutine.
-func (test *TestClientSuite) runBackend(url string, zmqType zmq.Type) {
-	fmt.Printf("backend running...\n")
+func (test *TestClientSuite) runBackend(funcName string, url string, zmqType zmq.Type) {
 	require := test.Require
+	test.funcName = funcName
 
 	var err error
 	test.backend, err = zmq.NewSocket(zmqType)
 	require().NoError(err)
 
-	fmt.Printf("backend bind to %s\n", url)
 	err = test.backend.Bind(url)
 	require().NoError(err)
 
-	fmt.Printf("backend waits for messages...\n")
 	msg, err := test.backend.RecvMessage(0)
 	if err == zmq.ErrorSocketClosed {
 		return
 	}
 	require().NoError(err)
 
-	fmt.Printf("backend received: %s\n", msg)
 	var reply []string
 	if len(msg) >= 3 {
 		reply = []string{msg[0], msg[1], fmt.Sprintf("reply to '%s'", msg[2])}
@@ -73,16 +73,11 @@ func (test *TestClientSuite) runBackend(url string, zmqType zmq.Type) {
 		reply = []string{fmt.Sprintf("reply to '%s'", msg[0])}
 	}
 
-	fmt.Printf("backend replies: %s\n", reply)
-
-	_, err = test.backend.SendMessage(reply)
+	_, err = test.backend.SendMessageDontwait(reply)
 	require().NoError(err)
 
-	fmt.Printf("backend replied: %s\n", reply)
 	err = test.backend.Close()
 	require().NoError(err)
-
-	fmt.Printf("backend closed!\n")
 
 	test.backend = nil
 }
@@ -129,20 +124,23 @@ func (test *TestClientSuite) Test_11_Parameters() {
 func (test *TestClientSuite) Test_12_rawSubmit() {
 	require := test.Require
 
-	go test.runBackend(test.socket.url, test.socket.target)
+	go test.runBackend("Test_12_rawSubmit", test.socket.url, test.socket.target)
 	// Wait a bit for initialization
 	time.Sleep(time.Millisecond * 100)
 
 	req := "hello Test_12_rawSubmit"
-	err := test.socket.rawSubmit(req)
+	timeout, err := test.socket.rawSubmit(req)
+	require().False(timeout)
 	require().NoError(err)
+	// wait for a message transfer a bit before closing
+	time.Sleep(time.Microsecond * 100)
 }
 
 // Test_13_RawRequest test requesting data.
 func (test *TestClientSuite) Test_13_RawRequest() {
 	require := test.Require
 
-	go test.runBackend(test.socket.url, test.socket.target)
+	go test.runBackend("Test_13_RawRequest", test.socket.url, test.socket.target)
 	// Wait a bit for initialization
 	time.Sleep(time.Millisecond * 100)
 
@@ -156,7 +154,7 @@ func (test *TestClientSuite) Test_13_RawRequest() {
 func (test *TestClientSuite) Test_14_RawSubmit() {
 	require := test.Require
 
-	go test.runBackend(test.socket.url, test.socket.target)
+	go test.runBackend("Test_14_RawSubmit", test.socket.url, test.socket.target)
 
 	req := "hello Test_14_RawSubmit"
 	err := test.socket.RawSubmit(req)
@@ -167,7 +165,7 @@ func (test *TestClientSuite) Test_14_RawSubmit() {
 func (test *TestClientSuite) Test_15_DealerRawRequest() {
 	require := test.Require
 
-	go test.runBackend(test.socket.url, test.socket.target)
+	go test.runBackend("Test_15_DealerRawRequest", test.socket.url, test.socket.target)
 	time.Sleep(time.Millisecond * 100)
 
 	socket, err := NewRaw(zmq.ROUTER, "inproc://sample_router")
@@ -189,7 +187,7 @@ func (test *TestClientSuite) Test_15_DealerRawRequest() {
 func (test *TestClientSuite) Test_16_DealerRawSubmit() {
 	require := test.Require
 
-	go test.runBackend(test.socket.url, test.socket.target)
+	go test.runBackend("Test_16_DealerRawSubmit", test.socket.url, test.socket.target)
 	time.Sleep(time.Millisecond * 100)
 
 	socket, err := NewRaw(zmq.ROUTER, "inproc://sample_router")
@@ -203,8 +201,8 @@ func (test *TestClientSuite) Test_16_DealerRawSubmit() {
 	err = test.socket.RawSubmit(req)
 	require().NoError(err)
 
-	// The backend closed
-	time.Sleep(time.Millisecond * 10)
+	// Wait a bit before closing so that message transfer to the handler delivered
+	time.Sleep(time.Millisecond * 100)
 }
 
 // In order for 'go test' to run this suite, we need to create
