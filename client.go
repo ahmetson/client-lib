@@ -68,7 +68,7 @@ func NewRaw(target zmq.Type, url string) (*Socket, error) {
 	go func() {
 		err := socket.schedulers.Run(time.Microsecond * 2)
 		if err != nil && err.Error() != "No sockets to poll, no channels to read" {
-			fmt.Fprintf(os.Stderr, "reactor exited with an error: %v\n", err)
+			_, _ = fmt.Fprintf(os.Stderr, "reactor exited with an error: %v\n", err)
 		}
 		socket.schedulers = nil
 	}()
