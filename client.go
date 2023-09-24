@@ -35,6 +35,7 @@ type Socket struct {
 	target     zmq.Type
 	config     *config.Client
 	queue      *data_type.Queue
+	sent       uint64
 }
 
 // NewRaw client based on the target zeromq socket type
@@ -55,6 +56,7 @@ func NewRaw(target zmq.Type, url string) (*Socket, error) {
 		queue:      data_type.NewQueue(),
 		schedulers: zmq.NewReactor(),
 		consumerId: 0,
+		sent:       1,
 	}
 
 	//err := socket.reconnect()
@@ -303,6 +305,9 @@ func (socket *Socket) rawSubmit(raw string) (bool, error) {
 	messages := []string{raw}
 	if socket.socketType == zmq.DEALER {
 		messages = []string{"", raw}
+	} else if socket.socketType == zmq.PAIR {
+		messages = []string{fmt.Sprintf("%d", socket.sent), "", raw}
+		socket.sent++
 	}
 
 	// Poll zmqSocket for a reply, with timeout
