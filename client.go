@@ -376,7 +376,7 @@ func (socket *Socket) Request(req message.RequestInterface) (message.ReplyInterf
 
 	reply, err := socket.messageOps.NewReply(rawReply)
 	if err != nil {
-		return nil, fmt.Errorf("failed to convert reply into the reply string: %w", err)
+		return nil, fmt.Errorf("messageOps.NewReply('%v'): %w", rawReply, err)
 	}
 
 	// client service will add its own stack.
