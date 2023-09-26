@@ -314,6 +314,8 @@ func (socket *Socket) rawSubmit(raw string) (bool, error) {
 	} else if socket.socketType == zmq.PAIR {
 		messages = []string{fmt.Sprintf("%d", socket.sent), "", raw}
 		socket.sent++
+	} else if socket.socketType == zmq.REQ && socket.target == zmq.ROUTER {
+		messages = []string{"", raw}
 	}
 
 	// Poll zmqSocket for a reply, with timeout
