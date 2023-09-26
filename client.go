@@ -298,7 +298,7 @@ func (socket *Socket) rawSubmitByTimeout(raw string) error {
 
 // rawSubmit sends the message; it doesn't wait for a reply to see was it successfully sent.
 //
-// returns if timeout or not.
+// returns boolean for timeout.
 func (socket *Socket) rawSubmit(raw string) (bool, error) {
 	// no need to reconnect every time.
 	err := socket.reconnect()
