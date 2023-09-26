@@ -36,6 +36,7 @@ type Socket struct {
 	config     *config.Client
 	queue      *data_type.Queue
 	sent       uint64
+	messageOps *message.Operations
 }
 
 // NewRaw client based on the target zeromq socket type
@@ -57,6 +58,7 @@ func NewRaw(target zmq.Type, url string) (*Socket, error) {
 		schedulers: zmq.NewReactor(),
 		consumerId: 0,
 		sent:       1,
+		messageOps: message.DefaultMessage(),
 	}
 
 	//err := socket.reconnect()
@@ -92,6 +94,10 @@ func New(client *config.Client) (*Socket, error) {
 	socket.config = client
 
 	return socket, nil
+}
+
+func (socket *Socket) SetMessageOperations(messageOps *message.Operations) {
+	socket.messageOps = messageOps
 }
 
 // handleConsume runs in a loop to read the queue.
@@ -330,10 +336,10 @@ func (socket *Socket) rawSubmit(raw string) (bool, error) {
 }
 
 //
-// The client that works with the message.Request and message.Reply
+// The client that works with the message.RequestInterface and message.ReplyInterface
 //
 
-func (socket *Socket) Submit(req *message.Request) error {
+func (socket *Socket) Submit(req message.RequestInterface) error {
 	reqStr, err := req.String()
 	if err != nil {
 		return fmt.Errorf("request.String: %w", err)
@@ -355,7 +361,7 @@ func (socket *Socket) Submit(req *message.Request) error {
 // If the client service returned a failure message, it's converted into an error.
 //
 // The zmqSocket type should be REQ or PUSH.
-func (socket *Socket) Request(req *message.Request) (*message.Reply, error) {
+func (socket *Socket) Request(req message.RequestInterface) (message.ReplyInterface, error) {
 	reqStr, err := req.String()
 	if err != nil {
 		return nil, fmt.Errorf("request.String: %w", err)
@@ -366,13 +372,13 @@ func (socket *Socket) Request(req *message.Request) (*message.Reply, error) {
 		return nil, fmt.Errorf("socket.RawRequest: %w", err)
 	}
 
-	reply, err := message.ParseReply(rawReply)
+	reply, err := socket.messageOps.NewReply(rawReply)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse the command '%s': %w", req.Command, err)
+		return nil, fmt.Errorf("failed to convert reply into the reply string: %w", err)
 	}
 
 	// client service will add its own stack.
-	req.SyncTrace(&reply)
+	req.SyncTrace(reply)
 
-	return &reply, nil
+	return reply, nil
 }
