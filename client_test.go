@@ -3,6 +3,8 @@ package client
 import (
 	"fmt"
 	"github.com/ahmetson/client-lib/config"
+	"github.com/ahmetson/common-lib/data_type/key_value"
+	"github.com/ahmetson/common-lib/message"
 	zmq "github.com/pebbe/zmq4"
 	"testing"
 	"time"
@@ -66,11 +68,29 @@ func (test *TestClientSuite) runBackend(funcName string, url string, zmqType zmq
 
 	var reply []string
 	if len(msg) >= 3 {
-		reply = []string{msg[0], msg[1], fmt.Sprintf("reply to '%s'", msg[2])}
+		content := (&message.Reply{
+			Status:  message.OK,
+			Message: "",
+			Parameters: key_value.New().
+				Set("reply", fmt.Sprintf("reply to '%s'", msg[2])),
+		}).String()
+		reply = []string{msg[0], msg[1], content}
 	} else if len(msg) >= 2 {
-		reply = []string{msg[0], fmt.Sprintf("reply to '%s'", msg[1])}
+		content := (&message.Reply{
+			Status:  message.OK,
+			Message: "",
+			Parameters: key_value.New().
+				Set("reply", fmt.Sprintf("reply to '%s'", msg[1])),
+		}).String()
+		reply = []string{msg[0], content}
 	} else {
-		reply = []string{fmt.Sprintf("reply to '%s'", msg[0])}
+		content := (&message.Reply{
+			Status:  message.OK,
+			Message: "",
+			Parameters: key_value.New().
+				Set("reply", fmt.Sprintf("reply to '%s'", msg[0])),
+		}).String()
+		reply = []string{content}
 	}
 
 	_, err = test.backend.SendMessageDontwait(reply)
@@ -203,6 +223,31 @@ func (test *TestClientSuite) Test_16_DealerRawSubmit() {
 
 	// Wait a bit before closing so that message transfer to the handler delivered
 	time.Sleep(time.Millisecond * 100)
+}
+
+// Test_17_RequestToRep test requesting data to the zmq.REP (handlerConfig.SyncReplier) way.
+func (test *TestClientSuite) Test_17_RequestToRep() {
+	require := test.Require
+
+	url := "inproc://sample_router"
+	go test.runBackend("Test_17_RequestToRep", url, zmq.REP)
+	time.Sleep(time.Millisecond * 100)
+
+	socket, err := NewRaw(zmq.REP, url)
+	require().NoError(err)
+	test.socket = socket
+
+	// Set minimal timeout and attempt for fast testing
+	test.socket.Timeout(time.Second).Attempt(minAttempt)
+
+	req := &message.Request{
+		Command:    "hello",
+		Parameters: key_value.New().Set("unit", "Test_17_RequestToRep"),
+	}
+	reply, err := test.socket.Request(req)
+	require().NoError(err)
+	fmt.Printf("client recevied: %s\n", reply)
+
 }
 
 // In order for 'go test' to run this suite, we need to create
