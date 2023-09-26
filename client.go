@@ -342,12 +342,12 @@ func (socket *Socket) rawSubmit(raw string) (bool, error) {
 //
 
 func (socket *Socket) Submit(req message.RequestInterface) error {
-	reqStr, err := req.String()
+	reqStr, err := req.ZmqEnvelope()
 	if err != nil {
 		return fmt.Errorf("request.String: %w", err)
 	}
 
-	err = socket.RawSubmit(reqStr)
+	err = socket.RawSubmit(message.JoinMessages(reqStr))
 	if err != nil {
 		return fmt.Errorf("socket.RawRequest: %w", err)
 	}
@@ -364,12 +364,12 @@ func (socket *Socket) Submit(req message.RequestInterface) error {
 //
 // The zmqSocket type should be REQ or PUSH.
 func (socket *Socket) Request(req message.RequestInterface) (message.ReplyInterface, error) {
-	reqStr, err := req.String()
+	reqStr, err := req.ZmqEnvelope()
 	if err != nil {
 		return nil, fmt.Errorf("request.String: %w", err)
 	}
 
-	rawReply, err := socket.RawRequest(reqStr)
+	rawReply, err := socket.RawRequest(message.JoinMessages(reqStr))
 	if err != nil {
 		return nil, fmt.Errorf("socket.RawRequest: %w", err)
 	}
