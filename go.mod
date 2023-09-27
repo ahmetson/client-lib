@@ -3,7 +3,7 @@ module github.com/ahmetson/client-lib
 go 1.19
 
 require (
-	github.com/ahmetson/common-lib v0.0.0-20230825195825-e7b69549b9a1
+	github.com/ahmetson/datatype-lib v0.0.0-20230825195825-e7b69549b9a1
 	github.com/stretchr/testify v1.8.2
 )
 
