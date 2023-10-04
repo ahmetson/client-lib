@@ -76,3 +76,15 @@ func TargetToClient(target zmq.Type) zmq.Type {
 		return zmq.REQ
 	}
 }
+
+// IsEqual returns true if the clients match.
+func IsEqual(first *Client, second *Client) bool {
+	if first == nil || second == nil {
+		return false
+	}
+
+	return first.Id == second.Id &&
+		first.Port == second.Port &&
+		first.TargetType == second.TargetType &&
+		first.ServiceUrl == second.ServiceUrl
+}
