@@ -13,8 +13,11 @@ import (
 )
 
 const (
-	minTimeout = time.Millisecond * 2
-	minAttempt = uint8(1)
+	minTimeout     = time.Millisecond * 2
+	DefaultTimeout = time.Second * 100
+
+	minAttempt     = uint8(1)
+	DefaultAttempt = uint8(5)
 )
 
 type Message struct {
@@ -48,8 +51,8 @@ func NewRaw(target zmq.Type, url string) (*Socket, error) {
 	socketType := config.TargetToClient(target)
 	socket := &Socket{
 		zmqSocket:  nil,
-		timeout:    time.Second * 10,
-		attempt:    5,
+		timeout:    DefaultTimeout,
+		attempt:    DefaultAttempt,
 		target:     target,
 		socketType: socketType,
 		url:        url,
