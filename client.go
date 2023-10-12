@@ -337,7 +337,7 @@ func (socket *Socket) rawSubmit(raw string) (bool, error) {
 
 	if len(sockets) > 0 {
 		//  We send a request, then we work to get a reply
-		if _, err := socket.zmqSocket.SendMessageDontwait(messages); err != nil {
+		if _, err := socket.zmqSocket.SendMessage(messages); err != nil {
 			return false, fmt.Errorf("zmqSocket.SendMessage: %w", err)
 		}
 
