@@ -179,6 +179,10 @@ func (test *TestClientSuite) Test_14_RawSubmit() {
 	req := "hello Test_14_RawSubmit"
 	err := test.socket.RawSubmit(req)
 	require().NoError(err)
+
+	// wait a bit for the backend clearing up it queue.
+	// otherwise TearDown will close the backend before backend sends it's message.
+	time.Sleep(time.Microsecond * 100)
 }
 
 // Test_15_DealerRawRequest test requesting data in asynchronous way.
@@ -200,7 +204,6 @@ func (test *TestClientSuite) Test_15_DealerRawRequest() {
 	reply, err := test.socket.RawRequest(req)
 	require().NoError(err)
 	fmt.Printf("client recevied: %s\n", reply)
-
 }
 
 // Test_16_DealerRawSubmit test submitting the message in request way.
