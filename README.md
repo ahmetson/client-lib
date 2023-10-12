@@ -1,56 +1,67 @@
 # Client Lib
-The client allows a connection to the Handlers.
+The `client` module is to message exchange with [SDS Handlers](https://github.com/ahmetson/handler-lib/).
 
 ## Terminology
-*Send* &ndash; a message transfer between a client and handler.
+*Transmit* &ndash; any message transfers between a client and handler.
 
-*Request* &ndash; a client sends the message to the handler.
-Then, waits for a reply.
-It guarantees a delivery.
+*Request* &ndash; is the two **transmits** with the handler. Sending and receiving. It guarantees a delivery.
 
-*Submit* &ndash; a client sends the message to the handler without waiting for a reply. 
-It doesn't guarantee a delivery.
+*Submit* &ndash; a one **transmit** with the handler.
+The client sends the message.
+Client doesn't wait for a reply. 
+
+*Target* &ndash; a handler to which a message is **transmitted**.
 
 ## Rules
 * Client has options
-* - *timeout* &ndash; option that halts sending after this amount. Minimum value is 2 milliseconds.
-* - *attempt* &ndash; option that sending will be tried after *timeout*. Minimum one attempt.
+* - *timeout* &ndash; option that halts sending after this period of time. Minimum value is 2 milliseconds.
+* - *attempt* &ndash; option that repeats the message **transmitting** after *timeout*. Minimum one attempt.
 * Client must set correct message parts for asynchronous handlers for internal zeromq socket.
-* Client must implement *request* and *submit*.
-* Client must be used from multiple threads.
 
 ## Implementation
 
 ### Options
-The default options are hardcoded.
 The default *timeout* is **10 Seconds**.
 The default *attempt* is **5**.
 
-The `Timeout(time.Duration)` method sets the timeout. 
+The `Client.Timeout(time.Duration)` method over-writes the timeout. 
 The `minimumTimeout` is **2 milliseconds**. 
 
-The `Attempt(uint8)` method sets the attempt. 
+The `Client.Attempt(uint8)` method sets the attempt. 
 The minimum attempt is *1*. 
 
 ### Type
-The type of the client is derived from the combination
-of the request socket and reply sockets.
+The type of the client is the opposite of the target type.
+Thus, when a client is defined, it's defined against the target to whom it will interact with.
 
-The type is derived from the target type.
+The handlers use the clients for creating a managers.
+To avoid import cycling the clients are using the target's internal socket type.
 
-### Multi thread
-Suppose we defined a client for extension.
-Then the extension client is passed to the handler function.
-Let's think that we have 20 concurrent requests.
-Each of the requests will use the client to send a message to the extension.
+For intercommunication SDS framework uses Zeromq sockets. 
 
-The submit function adds the user request to the queue with the channel.
-The submitting waits for a channel.
-The second concurrent request adds the message to the queue.
-Then wait for a reply in the channel.
+### Concurrent
+A client is concurrent with its message queue.
+A client is [thread safe](https://en.wikipedia.org/wiki/Thread_safety).
 
-The client has the consumer. 
-The consumer checks the queue.
-If the message is given in the queue, then sends.
-If the message has the channel, then reply back.
-And returns result in the channel.
+One client can send multiple messages at the same time.
+
+```go
+// Thread 1
+client1.Request(message)
+// Thread 2
+client1.Request(message)
+```
+
+> **Todo**
+> 
+> Optimize the client passing to the handle functions as one child is passed to multiple handle func.
+> We need to avoid passing from parent to the nested child tree.
+
+> Test the limits of the clients, and number of the threads.
+> Maybe create a pool of client sockets and get one when it's available?
+
+> **Todo**
+> 
+> Create a library of the pool for available sockets. 
+> Then design the handle and client based on that.
+
