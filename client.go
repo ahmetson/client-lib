@@ -237,7 +237,7 @@ func (socket *Socket) rawRequestByTimeout(raw string) ([]string, error) {
 	for {
 		attempt--
 		if attempt == 0 {
-			return nil, fmt.Errorf("timeout")
+			return nil, fmt.Errorf("request_timeout: reqMsg='%s'", raw)
 		}
 
 		timeout, err := socket.rawSubmit(raw)
@@ -301,7 +301,7 @@ func (socket *Socket) rawSubmitByTimeout(raw string) error {
 
 		attempt--
 		if attempt == 0 {
-			return fmt.Errorf("submit timeout")
+			return fmt.Errorf("submit_timeout: reqMsg='%s'", raw)
 		}
 	}
 	return nil
@@ -360,7 +360,7 @@ func (socket *Socket) Submit(req message.RequestInterface) error {
 
 	err = socket.RawSubmit(message.JoinMessages(reqStr))
 	if err != nil {
-		return fmt.Errorf("socket.RawRequest: %w", err)
+		return fmt.Errorf("socket.RawSubmit: %w", err)
 	}
 
 	return nil
