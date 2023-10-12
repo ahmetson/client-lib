@@ -20,12 +20,18 @@ const (
 	DefaultAttempt = uint8(5)
 )
 
-type Message struct {
-	Submit chan []string
-	Raw    string
+type Transmit struct {
+	replyMsg   chan []string
+	delayedErr chan error
+	reqMsg     string
 }
 
-// A Socket that connects to the handler.
+type Option struct {
+	timeout time.Duration
+	attempt uint8
+}
+
+// A Socket is the structure that transmits the data to the handlers.
 type Socket struct {
 	consumerId uint64 // consume internal id assigned by zeromq
 	poller     *zmq.Poller
@@ -118,23 +124,27 @@ func (socket *Socket) handleConsume() error {
 		return nil
 	}
 
-	msg := socket.queue.Pop().(*Message)
+	msg := socket.queue.Pop().(*Transmit)
 
-	if msg.Submit == nil {
-		err := socket.rawSubmitByTimeout(msg.Raw)
+	// Submit, not a Reply message
+	if msg.replyMsg == nil {
+		err := socket.rawSubmitByTimeout(msg.reqMsg)
 		if err != nil {
-			return fmt.Errorf("socket.rawSubmitByTimeout: %w", err)
+			msg.delayedErr <- fmt.Errorf("socket.rawSubmitByTimeout: %w", err)
+		} else {
+			msg.delayedErr <- nil
 		}
 		return nil
 	}
 
-	reply, err := socket.rawRequestByTimeout(msg.Raw)
-
-	msg.Submit <- reply
-
+	reply, err := socket.rawRequestByTimeout(msg.reqMsg)
 	if err != nil {
-		return fmt.Errorf("socket.RawSocket: %w", err)
+		msg.delayedErr <- err
+		return nil
 	}
+
+	msg.delayedErr <- nil
+	msg.replyMsg <- reply
 
 	return nil
 }
@@ -217,15 +227,21 @@ func (socket *Socket) RawRequest(raw string) ([]string, error) {
 	}
 
 	// todo, a message channel must return the error as well
-	// todo, rename Message to Send and Message.Submit a type to Reply.
-	msg := &Message{
-		Submit: make(chan []string),
-		Raw:    raw,
+	// todo, rename Transmit to Send and Transmit.reply a type to Reply.
+	msg := &Transmit{
+		replyMsg:   make(chan []string),
+		delayedErr: make(chan error),
+		reqMsg:     raw,
 	}
 	socket.queue.Push(msg)
 
-	reply := <-msg.Submit
+	err := <-msg.delayedErr
 
+	if err != nil {
+		return nil, err
+	}
+
+	reply := <-msg.replyMsg
 	return reply, nil
 }
 
@@ -277,13 +293,16 @@ func (socket *Socket) RawSubmit(raw string) error {
 		return fmt.Errorf("queue is full, try again later")
 	}
 
-	msg := &Message{
-		Submit: nil,
-		Raw:    raw,
+	msg := &Transmit{
+		replyMsg:   nil,
+		delayedErr: make(chan error),
+		reqMsg:     raw,
 	}
 	socket.queue.Push(msg)
 
-	return nil
+	err := <-msg.delayedErr
+
+	return err
 }
 
 func (socket *Socket) rawSubmitByTimeout(raw string) error {
