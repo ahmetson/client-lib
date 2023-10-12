@@ -29,7 +29,7 @@ type Message struct {
 type Socket struct {
 	consumerId uint64 // consume internal id assigned by zeromq
 	poller     *zmq.Poller
-	schedulers *zmq.Reactor
+	schedulers *zmq.Reactor // client keeps a zmqSocket for initialing a message transfer, and a queue consumer.
 	zmqSocket  *zmq.Socket
 	url        string
 	timeout    time.Duration
@@ -39,10 +39,22 @@ type Socket struct {
 	config     *config.Client
 	queue      *data_type.Queue
 	sent       uint64
-	messageOps *message.Operations
+	messageOps *message.Operations // client translates the message before and after transmitting using message operations.
 }
 
-// NewRaw client based on the target zeromq socket type
+// NewRaw returns a new client that's connected to the given url.
+// For it to work, the url must be provided with the protocol that is supported by zeromq.
+// Example of valid urls:
+//
+//   - tcp://localhost:6000
+//
+//   - inproc://internal_thread
+//
+// Invalid url:
+//
+//   - http://example.com/ 	-- HTTP protocol is not supported
+//
+//   - ./socket.pid 			-- File descriptors are not supported
 func NewRaw(target zmq.Type, url string) (*Socket, error) {
 	if !config.IsTarget(target) {
 		return nil, fmt.Errorf("target is not supported")
@@ -64,11 +76,7 @@ func NewRaw(target zmq.Type, url string) (*Socket, error) {
 		messageOps: message.DefaultMessage(),
 	}
 
-	//err := socket.reconnect()
-	//if err != nil {
-	//	return nil, fmt.Errorf("socket('%s').reconnect: %w", url, err)
-	//}
-
+	// we can remove the following lines
 	socket.consumerId = socket.schedulers.AddChannelTime(time.Tick(time.Microsecond), 0,
 		func(_ interface{}) error { return socket.handleConsume() })
 
