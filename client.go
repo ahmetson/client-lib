@@ -341,7 +341,7 @@ func (socket *Socket) rawSubmit(raw string) (bool, error) {
 	messages := []string{raw}
 	if socket.socketType == zmq.DEALER {
 		messages = []string{"", raw}
-	} else if socket.socketType == zmq.PAIR {
+	} else if socket.socketType == zmq.PAIR || socket.socketType == zmq.PUSH {
 		messages = []string{fmt.Sprintf("%d", socket.sent), "", raw}
 		socket.sent++
 	} else if socket.socketType == zmq.REQ && socket.target == zmq.ROUTER {
