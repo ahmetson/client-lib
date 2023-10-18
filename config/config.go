@@ -55,7 +55,7 @@ func Url(client *Client) string {
 
 // IsTarget checks that given zeromq socket type is the handler type
 func IsTarget(target zmq.Type) bool {
-	return target == zmq.REP || target == zmq.ROUTER || target == zmq.PUB || target == zmq.PUSH || target == zmq.PULL || target == zmq.PAIR
+	return target == zmq.REP || target == zmq.ROUTER || target == zmq.PUB || target == zmq.PULL || target == zmq.PAIR
 }
 
 // TargetToClient gets the ZMQ counter-part of the target.
@@ -65,8 +65,6 @@ func TargetToClient(target zmq.Type) zmq.Type {
 	switch target {
 	case zmq.PUB:
 		return zmq.SUB
-	case zmq.PUSH:
-		return zmq.PULL
 	case zmq.PULL:
 		return zmq.PUSH
 	case zmq.PAIR:
